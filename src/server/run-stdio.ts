@@ -6,6 +6,10 @@ import { SERVER_NAME, VERSION } from "../version.js";
 import { createServer } from "./create-server.js";
 
 export function startStdioServer(config: AppConfig, logger: Logger): StdioServerHandle {
+  for (const warning of config.warnings) {
+    logger.warn("Sight MCP is configured with a broad allowed root", { warning });
+  }
+
   logger.info("MCP stdio server starting", {
     logLevel: config.logLevel,
     server: SERVER_NAME,

@@ -22,6 +22,10 @@ defines precedence and secret handling.
 
 ## Variables
 
+The image-pipeline and logging variables are implemented by Issue #3. Provider, response,
+concurrency, queue, retry, and timeout variables remain normative v0.1.0 requirements and become
+active in their corresponding implementation Issues; until then they are not silently consumed.
+
 | Variable                            | Required/default | Validation and purpose                                                                                                        |
 | ----------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `SIGHT_PROVIDER_BASE_URL`           | required         | Absolute provider base URL ending at the API root, for example `https://provider.example/v1`; no userinfo, query, or fragment |
@@ -43,8 +47,8 @@ defines precedence and secret handling.
 | `SIGHT_MAX_RETRIES`                 | `2`              | Integer from 0 through 5; retries after the initial provider attempt                                                          |
 | `SIGHT_LOG_LEVEL`                   | `info`           | One of `silent`, `error`, `warn`, `info`, `debug`; output is always stderr and redacted                                       |
 
-The implementation must publish these defaults from one typed configuration module and reuse them in
-help text and documentation tests to prevent drift.
+The implementation must publish active defaults from one typed configuration module and reuse them
+in help text and documentation tests to prevent drift.
 
 If normalization cannot satisfy both transmit dimensions and transmit bytes without dropping
 required alpha information or violating the minimum JPEG quality, the call fails with

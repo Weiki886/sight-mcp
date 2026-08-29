@@ -3,9 +3,10 @@
 Sight MCP is a secure Model Context Protocol vision bridge for text-only models in Claude Code,
 Codex, and other MCP hosts.
 
-> [!IMPORTANT] The repository currently contains the TypeScript and MCP stdio foundation tracked by
-> [Issue #2](https://github.com/Weiki886/sight-mcp/issues/2). It intentionally exposes no tools and
-> cannot analyze images yet.
+> [!IMPORTANT] The repository currently contains the TypeScript/MCP stdio foundation and the secure
+> local-image preprocessing pipeline tracked by
+> [Issue #3](https://github.com/Weiki886/sight-mcp/issues/3). It intentionally exposes no MCP tools
+> and cannot call a vision provider yet.
 
 ## v0.1.0 direction
 
@@ -44,15 +45,26 @@ pnpm start
 The server reserves stdout for MCP protocol messages. Operational diagnostics are written to stderr
 as structured JSON.
 
-## Configuration
+## Current configuration
 
-The scaffold supports one optional environment variable:
+| Variable                       | Default    | Purpose                                                        |
+| ------------------------------ | ---------- | -------------------------------------------------------------- |
+| `SIGHT_ALLOWED_ROOTS`          | server cwd | Platform-delimited absolute directories eligible for image use |
+| `SIGHT_MAX_IMAGE_BYTES`        | `20971520` | Maximum source bytes read                                      |
+| `SIGHT_MAX_IMAGE_PIXELS`       | `40000000` | Maximum decoded pixels                                         |
+| `SIGHT_MAX_IMAGE_DIMENSION`    | `12000`    | Maximum decoded width or height                                |
+| `SIGHT_TRANSMIT_MAX_DIMENSION` | `2048`     | Maximum normalized width or height, without enlargement        |
+| `SIGHT_MAX_TRANSMIT_BYTES`     | `10485760` | Maximum normalized image bytes                                 |
+| `SIGHT_JPEG_QUALITY`           | `85`       | Opaque JPEG quality, from 40 through 95                        |
+| `SIGHT_LOG_LEVEL`              | `info`     | `silent`, `error`, `warn`, `info`, or `debug`                  |
 
-| Variable          | Default | Values                                     |
-| ----------------- | ------- | ------------------------------------------ |
-| `SIGHT_LOG_LEVEL` | `info`  | `silent`, `error`, `warn`, `info`, `debug` |
+Allowed roots must already exist and are canonicalized at startup. PNG, JPEG, and WebP inputs are
+recognized from their content rather than filename extensions. Images are normalized in memory,
+orientation is applied, metadata is removed, and opaque/alpha output is encoded as JPEG/PNG.
 
-Invalid values stop startup with a concise error and never echo environment contents.
+Invalid values stop startup with a concise error and never echo environment contents or local paths.
+Provider variables in the full configuration specification become active with the provider adapter
+milestone.
 
 ## Design documents
 
@@ -65,8 +77,8 @@ Invalid values stop startup with a concise error and never echo environment cont
 
 Project planning is tracked in the
 [`v0.1.0 — MVP`](https://github.com/Weiki886/sight-mcp/milestone/1) milestone. Secure local image
-handling, an OpenAI-compatible vision provider, and the `analyze_image` tool will be delivered by
-subsequent issues.
+handling is implemented locally; an OpenAI-compatible vision provider and the `analyze_image` tool
+will be delivered by subsequent issues.
 
 ## License
 

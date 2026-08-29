@@ -31,18 +31,20 @@
   "homepage": "https://github.com/Weiki886/sight-mcp#readme",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/mark-executable.mjs",
-    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:integration && pnpm pack:check",
+    "audit:prod": "pnpm audit --prod --audit-level high",
+    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:integration && pnpm pack:check && pnpm audit:prod",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
     "pack:check": "node scripts/check-pack.mjs",
     "start": "node dist/cli.js",
-    "test": "vitest run tests/unit tests/contract",
+    "test": "vitest run tests/unit tests/contract tests/security",
     "test:integration": "vitest run tests/integration",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
+    "sharp": "^0.35.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
