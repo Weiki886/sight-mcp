@@ -41,7 +41,7 @@ function registerShutdown(handle: StdioServerHandle, logger: Logger): void {
 }
 
 try {
-  const config = loadConfig();
+  const config = await loadConfig();
   const logger = createLogger(config.logLevel);
   const handle = startStdioServer(config, logger);
   registerShutdown(handle, logger);

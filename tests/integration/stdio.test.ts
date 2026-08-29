@@ -57,7 +57,7 @@ describe("stdio CLI", () => {
 
     expect(exitCode).toBe(1);
     expect(stdout).toBe("");
-    expect(stderr).toContain("SIGHT_LOG_LEVEL must be one of");
+    expect(stderr).toContain("SIGHT_LOG_LEVEL is invalid.");
     expect(stderr).not.toContain("invalid-secret-value");
   });
 });

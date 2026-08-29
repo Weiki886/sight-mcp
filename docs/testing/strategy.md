@@ -36,6 +36,8 @@ The normal test suite never calls a live provider and never requires a real cred
 - Store expected answers only for the deterministic fake provider. Do not assert natural-language
   equality from a real model.
 - Every binary fixture has a short provenance/readme entry and expected security purpose.
+- Issue #3 image fixtures are generated programmatically by the security tests, keeping binary
+  provenance explicit without committing opaque sample files.
 
 ## Unit matrix
 
@@ -176,6 +178,7 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm pack:check
+pnpm audit:prod
 ```
 
 CI invokes the same scripts rather than duplicating behavior in workflow YAML.
