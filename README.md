@@ -1,9 +1,11 @@
 # Sight MCP
 
-Sight MCP is a planned Model Context Protocol server that gives text-only models in Claude Code, Codex, and other MCP hosts access to a separately configured vision model.
+Sight MCP is a secure Model Context Protocol vision bridge for text-only models in Claude Code,
+Codex, and other MCP hosts.
 
-> [!IMPORTANT]
-> The project is in the design phase. No runnable server has been released yet.
+> [!IMPORTANT] The repository currently contains the TypeScript and MCP stdio foundation tracked by
+> [Issue #2](https://github.com/Weiki886/sight-mcp/issues/2). It intentionally exposes no tools and
+> cannot analyze images yet.
 
 ## v0.1.0 direction
 
@@ -13,7 +15,44 @@ The first release will expose one stdio MCP tool:
 analyze_image(path, prompt)
 ```
 
-The server will authorize and preprocess a local image, send the normalized image to an OpenAI-compatible vision endpoint, and return both readable text and structured metadata. Local model gateways and remote providers use the same adapter contract.
+The server will authorize and preprocess a local image, send the normalized image to an
+OpenAI-compatible vision endpoint, and return both readable text and structured metadata. Local
+model gateways and remote providers use the same adapter contract.
+
+## Development
+
+Requirements:
+
+- Node.js 22 or newer
+- pnpm 10.32.0 through Corepack
+
+Install dependencies and run the complete local quality gate:
+
+```sh
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run ci
+```
+
+Start the built stdio server:
+
+```sh
+pnpm build
+pnpm start
+```
+
+The server reserves stdout for MCP protocol messages. Operational diagnostics are written to stderr
+as structured JSON.
+
+## Configuration
+
+The scaffold supports one optional environment variable:
+
+| Variable          | Default | Values                                     |
+| ----------------- | ------- | ------------------------------------------ |
+| `SIGHT_LOG_LEVEL` | `info`  | `silent`, `error`, `warn`, `info`, `debug` |
+
+Invalid values stop startup with a concise error and never echo environment contents.
 
 ## Design documents
 
@@ -24,7 +63,10 @@ The server will authorize and preprocess a local image, send the normalized imag
 - [Threat model](docs/security/threat-model.md)
 - [Test and delivery strategy](docs/testing/strategy.md)
 
-Project planning is tracked in [Issue #1](https://github.com/Weiki886/sight-mcp/issues/1) and the [`v0.1.0 — MVP`](https://github.com/Weiki886/sight-mcp/milestone/1) milestone.
+Project planning is tracked in the
+[`v0.1.0 — MVP`](https://github.com/Weiki886/sight-mcp/milestone/1) milestone. Secure local image
+handling, an OpenAI-compatible vision provider, and the `analyze_image` tool will be delivered by
+subsequent issues.
 
 ## License
 
