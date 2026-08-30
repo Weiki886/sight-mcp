@@ -15,7 +15,11 @@ describe("stdio CLI", () => {
       args: [cliPath],
       command: process.execPath,
       cwd: projectRoot,
-      env: { SIGHT_LOG_LEVEL: "info" },
+      env: {
+        SIGHT_LOG_LEVEL: "info",
+        SIGHT_PROVIDER_BASE_URL: "http://127.0.0.1:11434/v1",
+        SIGHT_PROVIDER_MODEL: "test-vision-model",
+      },
       stderr: "pipe",
     });
     const stderrChunks: string[] = [];
@@ -41,6 +45,8 @@ describe("stdio CLI", () => {
       env: {
         PATH: process.env["PATH"],
         SIGHT_LOG_LEVEL: "invalid-secret-value",
+        SIGHT_PROVIDER_BASE_URL: "http://127.0.0.1:11434/v1",
+        SIGHT_PROVIDER_MODEL: "test-vision-model",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
