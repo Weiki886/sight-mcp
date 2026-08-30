@@ -22,9 +22,9 @@ defines precedence and secret handling.
 
 ## Variables
 
-The image-pipeline and logging variables are implemented by Issue #3. Provider, response,
-concurrency, queue, retry, and timeout variables remain normative v0.1.0 requirements and become
-active in their corresponding implementation Issues; until then they are not silently consumed.
+The image-pipeline and logging variables are implemented by Issue #3. Provider URL/model/key,
+Provider response, retry, and timeout variables are implemented by Issue #4. Concurrency and queue
+variables remain normative v0.1.0 requirements for Issue #5 and are not silently consumed yet.
 
 | Variable                            | Required/default | Validation and purpose                                                                                                        |
 | ----------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |

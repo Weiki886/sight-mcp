@@ -25,6 +25,35 @@ export const imageConfigDefaults = Object.freeze({
   transmitMaxDimension: 2_048,
 });
 
+export const providerConfigDefaults = Object.freeze({
+  maxOutputChars: 32_000,
+  maxResponseBytes: 1_048_576,
+  maxRetries: 2,
+  maxTokens: 4_096,
+  requestTimeoutMs: 60_000,
+});
+
+const providerApiKeyBrand: unique symbol = Symbol("ProviderApiKey");
+
+export interface ProviderApiKey {
+  readonly [providerApiKeyBrand]: true;
+  readonly redacted: "[REDACTED]";
+  readonly toJSON: () => "[REDACTED]";
+  readonly toString: () => "[REDACTED]";
+}
+
+export interface ProviderConfig {
+  readonly apiKey?: ProviderApiKey;
+  readonly baseUrl: string;
+  readonly completionUrl: string;
+  readonly maxOutputChars: number;
+  readonly maxResponseBytes: number;
+  readonly maxRetries: number;
+  readonly maxTokens: number;
+  readonly model: string;
+  readonly requestTimeoutMs: number;
+}
+
 export interface ImageConfig {
   readonly allowedRoots: readonly string[];
   readonly jpegQuality: number;
@@ -38,6 +67,7 @@ export interface ImageConfig {
 export interface AppConfig {
   readonly image: ImageConfig;
   readonly logLevel: LogLevel;
+  readonly provider: ProviderConfig;
   readonly warnings: readonly ConfigWarning[];
 }
 
@@ -70,8 +100,133 @@ const environmentSchema = z.object({
   SIGHT_MAX_IMAGE_DIMENSION: integerString(imageConfigDefaults.maxImageDimension, 1, 32_768),
   SIGHT_MAX_IMAGE_PIXELS: integerString(imageConfigDefaults.maxImagePixels, 1, 100_000_000),
   SIGHT_MAX_TRANSMIT_BYTES: integerString(imageConfigDefaults.maxTransmitBytes, 1_024, 104_857_600),
+  SIGHT_MAX_OUTPUT_CHARS: integerString(providerConfigDefaults.maxOutputChars, 256, 200_000),
+  SIGHT_MAX_PROVIDER_RESPONSE_BYTES: integerString(
+    providerConfigDefaults.maxResponseBytes,
+    1_024,
+    10_485_760,
+  ),
+  SIGHT_MAX_RETRIES: integerString(providerConfigDefaults.maxRetries, 0, 5),
+  SIGHT_PROVIDER_API_KEY: z.string().optional(),
+  SIGHT_PROVIDER_BASE_URL: z.string(),
+  SIGHT_PROVIDER_MAX_TOKENS: integerString(providerConfigDefaults.maxTokens, 1, 32_768),
+  SIGHT_PROVIDER_MODEL: z.string().min(1).max(256),
+  SIGHT_REQUEST_TIMEOUT_MS: integerString(providerConfigDefaults.requestTimeoutMs, 1_000, 300_000),
   SIGHT_TRANSMIT_MAX_DIMENSION: integerString(imageConfigDefaults.transmitMaxDimension, 64, 32_768),
 });
+
+const providerApiKeys = new WeakMap<ProviderApiKey, string>();
+
+function createProviderApiKey(value: string): ProviderApiKey {
+  const apiKey: ProviderApiKey = {
+    [providerApiKeyBrand]: true,
+    redacted: "[REDACTED]",
+    toJSON: (): "[REDACTED]" => "[REDACTED]",
+    toString: (): "[REDACTED]" => "[REDACTED]",
+  };
+  Object.freeze(apiKey);
+  providerApiKeys.set(apiKey, value);
+  return apiKey;
+}
+
+export function revealProviderApiKey(apiKey: ProviderApiKey): string {
+  const value = providerApiKeys.get(apiKey);
+  if (value === undefined) {
+    throw new ConfigError("SIGHT_PROVIDER_API_KEY is invalid.");
+  }
+  return value;
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  const unwrappedHostname =
+    hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
+  if (unwrappedHostname === "localhost" || unwrappedHostname === "::1") {
+    return true;
+  }
+
+  const octets = unwrappedHostname.split(".");
+  return (
+    octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((octet) => /^\d{1,3}$/u.test(octet) && Number(octet) <= 255)
+  );
+}
+
+function normalizeProviderUrls(
+  value: string,
+): Readonly<{ baseUrl: string; completionUrl: string }> {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new ConfigError("SIGHT_PROVIDER_BASE_URL is invalid.");
+  }
+
+  if (
+    value.trim() !== value ||
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username !== "" ||
+    url.password !== "" ||
+    value.includes("?") ||
+    value.includes("#") ||
+    /%2f|%5c/iu.test(url.pathname)
+  ) {
+    throw new ConfigError("SIGHT_PROVIDER_BASE_URL is invalid.");
+  }
+  if (url.protocol === "http:" && !isLoopbackHostname(url.hostname)) {
+    throw new ConfigError("SIGHT_PROVIDER_BASE_URL is invalid.");
+  }
+
+  const pathSegments = url.pathname.toLowerCase().split("/").filter(Boolean);
+  if (
+    pathSegments.some(
+      (segment, index) => segment === "chat" && pathSegments[index + 1] === "completions",
+    )
+  ) {
+    throw new ConfigError("SIGHT_PROVIDER_BASE_URL is invalid.");
+  }
+
+  const normalizedPath = url.pathname.replace(/\/+$/u, "");
+  const baseUrl = `${url.origin}${normalizedPath}`;
+  return Object.freeze({ baseUrl, completionUrl: `${baseUrl}/chat/completions` });
+}
+
+function providerApiKey(value: string | undefined): ProviderApiKey | undefined {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  if (value.length > 8_192 || !isPrintableAsciiToken(value)) {
+    throw new ConfigError("SIGHT_PROVIDER_API_KEY is invalid.");
+  }
+  return createProviderApiKey(value);
+}
+
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 31 || code === 127) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isPrintableAsciiToken(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 33 || code > 126) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function providerModel(value: string): string {
+  if (value.trim().length === 0 || hasControlCharacter(value)) {
+    throw new ConfigError("SIGHT_PROVIDER_MODEL is invalid.");
+  }
+  return value;
+}
 
 function isWithinRoot(root: string, candidate: string): boolean {
   const difference = relative(root, candidate);
@@ -161,7 +316,15 @@ export async function loadConfig(
     SIGHT_MAX_IMAGE_BYTES: environment["SIGHT_MAX_IMAGE_BYTES"],
     SIGHT_MAX_IMAGE_DIMENSION: environment["SIGHT_MAX_IMAGE_DIMENSION"],
     SIGHT_MAX_IMAGE_PIXELS: environment["SIGHT_MAX_IMAGE_PIXELS"],
+    SIGHT_MAX_OUTPUT_CHARS: environment["SIGHT_MAX_OUTPUT_CHARS"],
+    SIGHT_MAX_PROVIDER_RESPONSE_BYTES: environment["SIGHT_MAX_PROVIDER_RESPONSE_BYTES"],
+    SIGHT_MAX_RETRIES: environment["SIGHT_MAX_RETRIES"],
     SIGHT_MAX_TRANSMIT_BYTES: environment["SIGHT_MAX_TRANSMIT_BYTES"],
+    SIGHT_PROVIDER_API_KEY: environment["SIGHT_PROVIDER_API_KEY"],
+    SIGHT_PROVIDER_BASE_URL: environment["SIGHT_PROVIDER_BASE_URL"],
+    SIGHT_PROVIDER_MAX_TOKENS: environment["SIGHT_PROVIDER_MAX_TOKENS"],
+    SIGHT_PROVIDER_MODEL: environment["SIGHT_PROVIDER_MODEL"],
+    SIGHT_REQUEST_TIMEOUT_MS: environment["SIGHT_REQUEST_TIMEOUT_MS"],
     SIGHT_TRANSMIT_MAX_DIMENSION: environment["SIGHT_TRANSMIT_MAX_DIMENSION"],
   });
 
@@ -174,7 +337,12 @@ export async function loadConfig(
     SIGHT_MAX_IMAGE_BYTES: maxImageBytes,
     SIGHT_MAX_IMAGE_DIMENSION: maxImageDimension,
     SIGHT_MAX_IMAGE_PIXELS: maxImagePixels,
+    SIGHT_MAX_OUTPUT_CHARS: maxOutputChars,
+    SIGHT_MAX_PROVIDER_RESPONSE_BYTES: maxResponseBytes,
+    SIGHT_MAX_RETRIES: maxRetries,
     SIGHT_MAX_TRANSMIT_BYTES: maxTransmitBytes,
+    SIGHT_PROVIDER_MAX_TOKENS: maxTokens,
+    SIGHT_REQUEST_TIMEOUT_MS: requestTimeoutMs,
     SIGHT_TRANSMIT_MAX_DIMENSION: transmitMaxDimension,
   } = result.data;
 
@@ -206,10 +374,23 @@ export async function loadConfig(
     maxTransmitBytes,
     transmitMaxDimension,
   });
+  const providerUrls = normalizeProviderUrls(result.data.SIGHT_PROVIDER_BASE_URL);
+  const apiKey = providerApiKey(result.data.SIGHT_PROVIDER_API_KEY);
+  const provider: ProviderConfig = Object.freeze({
+    ...(apiKey === undefined ? {} : { apiKey }),
+    ...providerUrls,
+    maxOutputChars,
+    maxResponseBytes,
+    maxRetries,
+    maxTokens,
+    model: providerModel(result.data.SIGHT_PROVIDER_MODEL),
+    requestTimeoutMs,
+  });
 
   return Object.freeze({
     image,
     logLevel: result.data.SIGHT_LOG_LEVEL,
+    provider,
     warnings: Object.freeze(warnings),
   });
 }
