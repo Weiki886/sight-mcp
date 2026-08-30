@@ -1,6 +1,6 @@
 # OpenAI-compatible vision Provider
 
-- Status: Implemented internally; public MCP Tool integration remains Issue #5
+- Status: Implemented and connected to the public `analyze_image` MCP Tool by Issue #5
 - Adapter name: `openai-compatible`
 - Operation: `{SIGHT_PROVIDER_BASE_URL}/chat/completions`
 - Formats transmitted: normalized JPEG or PNG data URL

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   ConfigError,
+  executionConfigDefaults,
   imageConfigDefaults,
   loadConfig,
   providerConfigDefaults,
@@ -43,6 +44,7 @@ describe("loadConfig", () => {
     const directory = await temporaryDirectory();
 
     await expect(loadConfig(environment(), { cwd: directory })).resolves.toEqual({
+      execution: executionConfigDefaults,
       image: {
         allowedRoots: [await realpath(directory)],
         ...imageConfigDefaults,
@@ -65,6 +67,7 @@ describe("loadConfig", () => {
     });
 
     expect(Object.isFrozen(config)).toBe(true);
+    expect(Object.isFrozen(config.execution)).toBe(true);
     expect(Object.isFrozen(config.image)).toBe(true);
     expect(Object.isFrozen(config.image.allowedRoots)).toBe(true);
     expect(Object.isFrozen(config.provider)).toBe(true);
@@ -214,5 +217,22 @@ describe("loadConfig", () => {
     await expect(
       loadConfig(environment({ SIGHT_MAX_OUTPUT_CHARS: "255" }), { cwd: directory }),
     ).rejects.toThrow("SIGHT_MAX_OUTPUT_CHARS is invalid.");
+  });
+
+  it("validates bounded concurrency and queue settings", async () => {
+    const directory = await temporaryDirectory();
+
+    await expect(
+      loadConfig(environment({ SIGHT_MAX_CONCURRENCY: "0" }), { cwd: directory }),
+    ).rejects.toThrow("SIGHT_MAX_CONCURRENCY is invalid.");
+    await expect(
+      loadConfig(environment({ SIGHT_MAX_QUEUE_SIZE: "129" }), { cwd: directory }),
+    ).rejects.toThrow("SIGHT_MAX_QUEUE_SIZE is invalid.");
+
+    await expect(
+      loadConfig(environment({ SIGHT_MAX_CONCURRENCY: "4", SIGHT_MAX_QUEUE_SIZE: "0" }), {
+        cwd: directory,
+      }),
+    ).resolves.toMatchObject({ execution: { maxConcurrency: 4, maxQueueSize: 0 } });
   });
 });
