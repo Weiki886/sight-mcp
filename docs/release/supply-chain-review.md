@@ -25,6 +25,7 @@
 - Only the `main`-push attestation job receives `id-token: write` and `attestations: write`.
 - All Actions are pinned to full reviewed commit SHAs. Added release Actions were resolved from
   their official repositories:
+  - `pnpm/action-setup` v6.0.10 — `0977fd99725f1db4007ccb2928dbb4e90d06cc86`;
   - `actions/upload-artifact` v7.0.1 — `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`;
   - `actions/download-artifact` v8.0.1 — `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`;
   - `actions/attest-build-provenance` v4.2.2 — `4d101475d8b20a2381f78447822ac1eab6504dd8`.
