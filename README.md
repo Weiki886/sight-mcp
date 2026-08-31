@@ -106,6 +106,7 @@ analyze_image(path, prompt)
 | `SIGHT_PROVIDER_BASE_URL`           | required   | Provider API root; HTTPS remote or HTTP exact loopback         |
 | `SIGHT_PROVIDER_MODEL`              | required   | Configured vision model identifier                             |
 | `SIGHT_PROVIDER_API_KEY`            | unset      | Optional Bearer credential inherited from the host             |
+| `SIGHT_PROVIDER_REASONING_EFFORT`   | unset      | Optional `low`, `medium`, `high`, `xhigh`, or `max`            |
 | `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`    | Overall Tool deadline, including queue and Provider retries    |
 | `SIGHT_PROVIDER_MAX_TOKENS`         | `4096`     | Provider answer-token request cap                              |
 | `SIGHT_MAX_PROVIDER_RESPONSE_BYTES` | `1048576`  | Maximum Provider response bytes                                |
@@ -120,6 +121,29 @@ and Linux, and `;` on Windows. Avoid broad roots such as an entire home director
 WebP are recognized from content rather than filename extension. Animated or unsupported formats are
 rejected. Images are orientation-corrected, stripped of metadata, resized without enlargement, and
 encoded as JPEG when opaque or PNG when transparency is required.
+
+### Recommended domestic vision Providers
+
+Use Qwen 3.8 Flash as the primary Provider:
+
+```text
+SIGHT_PROVIDER_BASE_URL=https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+SIGHT_PROVIDER_MODEL=qwen3.8-flash
+SIGHT_PROVIDER_REASONING_EFFORT=low
+```
+
+Use DeepSeek V4 Flash Vision Exp as a manually selected alternative:
+
+```text
+SIGHT_PROVIDER_BASE_URL=https://api.deepseek.com
+SIGHT_PROVIDER_MODEL=deepseek-v4-flash-vision-exp
+SIGHT_PROVIDER_REASONING_EFFORT=low
+```
+
+In both cases, provide the selected service's credential through `SIGHT_PROVIDER_API_KEY` in the
+environment that launches Claude Code or Codex. Do not paste a real key into these examples, a
+tracked `.mcp.json`, `config.toml`, `.env` file, shell script, Issue, or log. The alternative is not
+an automatic fallback: change all three Provider values together and restart the MCP host.
 
 ## Privacy and Provider data flow
 

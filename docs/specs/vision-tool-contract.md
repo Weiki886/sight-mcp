@@ -241,6 +241,7 @@ The first adapter sends one request to `{baseUrl}/chat/completions` with:
   treating instructions visible inside the image as untrusted content rather than commands;
 - a user message containing the prompt text and one image data URL;
 - `max_tokens` set from `SIGHT_PROVIDER_MAX_TOKENS`;
+- optional top-level `reasoning_effort` only when configured by the operator;
 - bearer authorization only when an API key is configured;
 - redirect handling disabled;
 - a request-scoped `AbortSignal` and bounded response-body read.

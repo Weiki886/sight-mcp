@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Accepted: 2026-08-28
+- Amended: 2026-08-31 by Issue #14 (optional Provider reasoning effort)
 - Version: v0.1.0
 - Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.md)
 
@@ -31,6 +32,7 @@ variables are implemented by Issue #5 at the application-service boundary.
 | `SIGHT_PROVIDER_BASE_URL`           | required         | Absolute provider base URL ending at the API root, for example `https://provider.example/v1`; no userinfo, query, or fragment |
 | `SIGHT_PROVIDER_MODEL`              | required         | Non-empty model identifier, maximum 256 characters                                                                            |
 | `SIGHT_PROVIDER_API_KEY`            | optional         | Bearer credential; empty/unset means no authorization header, suitable for local endpoints                                    |
+| `SIGHT_PROVIDER_REASONING_EFFORT`   | optional         | `low`, `medium`, `high`, `xhigh`, or `max`; omitted unless explicitly configured                                              |
 | `SIGHT_ALLOWED_ROOTS`               | process cwd      | Platform-delimited absolute roots using Node's `path.delimiter`; each root is canonicalized at startup                        |
 | `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`          | Integer from 1000 through 300000; overall tool-call deadline including queue and retries                                      |
 | `SIGHT_MAX_IMAGE_BYTES`             | `20971520`       | Integer from 1 through 104857600; maximum source bytes read                                                                   |
@@ -49,6 +51,11 @@ variables are implemented by Issue #5 at the application-service boundary.
 
 The implementation must publish active defaults from one typed configuration module and reuse them
 in help text and documentation tests to prevent drift.
+
+`SIGHT_PROVIDER_REASONING_EFFORT` is an optional extension field for compatible Providers. When it
+is unset, the adapter does not send `reasoning_effort`, preserving the minimum Chat Completions
+request. Operators must choose a value supported by their configured model; Sight MCP validates the
+portable enum but does not infer a vendor or silently rewrite one Provider's model-specific mapping.
 
 If normalization cannot satisfy both transmit dimensions and transmit bytes without dropping
 required alpha information or violating the minimum JPEG quality, the call fails with

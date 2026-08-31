@@ -209,6 +209,7 @@ function requestBody(request: VisionRequest, config: ProviderConfig): string {
       },
     ],
     model: config.model,
+    ...(config.reasoningEffort === undefined ? {} : { reasoning_effort: config.reasoningEffort }),
   });
 }
 

@@ -163,6 +163,65 @@ describe("OpenAI-compatible vision provider", () => {
     expect(authorization).toBeNull();
   });
 
+  it("sends an explicitly configured reasoning effort as a top-level request field", async () => {
+    const config = await providerConfig({ SIGHT_PROVIDER_REASONING_EFFORT: "low" });
+    let capturedBody: string | undefined;
+    const provider = createOpenAICompatibleProvider(config, {
+      fetch: (_input, init) => {
+        capturedBody = typeof init.body === "string" ? init.body : undefined;
+        return Promise.resolve(successResponse());
+      },
+    });
+
+    await expect(provider.analyze(visionRequest())).resolves.toMatchObject({ ok: true });
+    expect(capturedBody).toBeDefined();
+    if (capturedBody === undefined) {
+      throw new Error("Expected a JSON request body.");
+    }
+    expect(JSON.parse(capturedBody)).toMatchObject({ reasoning_effort: "low" });
+  });
+
+  it.each([
+    [
+      "Qwen 3.8 Flash",
+      "https://workspace-123.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "qwen3.8-flash",
+      "https://workspace-123.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+    ],
+    [
+      "DeepSeek V4 Flash Vision Exp",
+      "https://api.deepseek.com",
+      "deepseek-v4-flash-vision-exp",
+      "https://api.deepseek.com/chat/completions",
+    ],
+  ])(
+    "maps the documented %s configuration to the compatible request contract",
+    async (_name, baseUrl, model, expectedUrl) => {
+      const config = await providerConfig({
+        SIGHT_PROVIDER_BASE_URL: baseUrl,
+        SIGHT_PROVIDER_MODEL: model,
+        SIGHT_PROVIDER_REASONING_EFFORT: "low",
+      });
+      let capturedUrl = "";
+      let capturedBody: string | undefined;
+      const provider = createOpenAICompatibleProvider(config, {
+        fetch: (input, init) => {
+          capturedUrl = String(input);
+          capturedBody = typeof init.body === "string" ? init.body : undefined;
+          return Promise.resolve(successResponse());
+        },
+      });
+
+      await expect(provider.analyze(visionRequest())).resolves.toMatchObject({ ok: true });
+      expect(capturedUrl).toBe(expectedUrl);
+      expect(capturedBody).toBeDefined();
+      if (capturedBody === undefined) {
+        throw new Error("Expected a JSON request body.");
+      }
+      expect(JSON.parse(capturedBody)).toMatchObject({ model, reasoning_effort: "low" });
+    },
+  );
+
   it("accepts documented text-part responses, trustworthy usage, and Unicode-safe truncation", async () => {
     const baseConfig = await providerConfig();
     const provider = createOpenAICompatibleProvider(
