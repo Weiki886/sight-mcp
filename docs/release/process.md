@@ -3,7 +3,8 @@
 - Status: release-candidate automation implemented; publication approval pending
 - Owner: repository maintainer
 - Related: [Issue #6](https://github.com/Weiki886/sight-mcp/issues/6),
-  [v0.1.0 release notes](v0.1.0.md), [Host smoke procedure](host-smoke.md)
+  [v0.1.0 release notes](v0.1.0.md), [Host smoke procedure](host-smoke.md),
+  [accepted local smoke record](smoke-record-v0.1.0-rc.md)
 
 This runbook separates reproducible preparation from the irreversible npm publish, Git tag, and
 GitHub Release steps. No release operator may rebuild the tarball after it has passed Host smoke.
