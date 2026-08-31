@@ -2,7 +2,7 @@
 
 - Executed: 2026-08-31 (Asia/Shanghai)
 - Package: `@weiki886/sight-mcp@0.1.0`
-- Candidate source commit: `621d424b91f2294406ae0728f6b5340032c69144`
+- Candidate implementation commit: `621d42418b8b584e3067f2def30f73397b248ca6`
 - Candidate file: `weiki886-sight-mcp-0.1.0.tgz`
 - SHA-256: `b3c196e678c76f833cdd846baee39f4572392dea4ae69b9cde349cbd10026c3f`
 - Provider: local synthetic OpenAI-compatible endpoint; no Provider credential
