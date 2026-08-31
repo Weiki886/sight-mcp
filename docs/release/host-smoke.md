@@ -4,6 +4,9 @@
 - Inputs: one candidate `.tgz`, synthetic fixtures, local synthetic OpenAI-compatible endpoint
 - Output: sanitized JSON records tied to the candidate SHA-256
 
+The accepted local v0.1.0 candidate evidence is recorded in
+[smoke-record-v0.1.0-rc.md](smoke-record-v0.1.0-rc.md).
+
 Run this matrix from the packed artifact, never from the source checkout. The helper installs the
 archive into a new temporary directory, creates non-personal fixtures at runtime, starts a loopback
 Provider, gives each Host an isolated MCP configuration, and discards raw Host output.
