@@ -202,6 +202,37 @@ describe("loadConfig", () => {
     }
   });
 
+  it.each(["low", "medium", "high", "xhigh", "max"] as const)(
+    "accepts provider reasoning effort %s",
+    async (reasoningEffort) => {
+      const directory = await temporaryDirectory();
+
+      await expect(
+        loadConfig(environment({ SIGHT_PROVIDER_REASONING_EFFORT: reasoningEffort }), {
+          cwd: directory,
+        }),
+      ).resolves.toMatchObject({ provider: { reasoningEffort } });
+    },
+  );
+
+  it("rejects an invalid provider reasoning effort without echoing it", async () => {
+    const directory = await temporaryDirectory();
+    const invalidEffort = "private-invalid-effort-canary";
+    let received: unknown;
+
+    try {
+      await loadConfig(environment({ SIGHT_PROVIDER_REASONING_EFFORT: invalidEffort }), {
+        cwd: directory,
+      });
+    } catch (error: unknown) {
+      received = error;
+    }
+
+    expect(received).toBeInstanceOf(ConfigError);
+    expect(String(received)).toContain("SIGHT_PROVIDER_REASONING_EFFORT is invalid.");
+    expect(String(received)).not.toContain(invalidEffort);
+  });
+
   it("validates provider resource limits", async () => {
     const directory = await temporaryDirectory();
 

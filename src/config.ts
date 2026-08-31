@@ -12,8 +12,10 @@ import {
 import { z } from "zod";
 
 export const logLevels = ["silent", "error", "warn", "info", "debug"] as const;
+export const providerReasoningEfforts = ["low", "medium", "high", "xhigh", "max"] as const;
 
 export type LogLevel = (typeof logLevels)[number];
+export type ProviderReasoningEffort = (typeof providerReasoningEfforts)[number];
 export type ConfigWarning = "BROAD_ALLOWED_ROOT";
 
 export const imageConfigDefaults = Object.freeze({
@@ -56,6 +58,7 @@ export interface ProviderConfig {
   readonly maxRetries: number;
   readonly maxTokens: number;
   readonly model: string;
+  readonly reasoningEffort?: ProviderReasoningEffort;
   readonly requestTimeoutMs: number;
 }
 
@@ -124,6 +127,7 @@ const environmentSchema = z.object({
   SIGHT_PROVIDER_BASE_URL: z.string(),
   SIGHT_PROVIDER_MAX_TOKENS: integerString(providerConfigDefaults.maxTokens, 1, 32_768),
   SIGHT_PROVIDER_MODEL: z.string().min(1).max(256),
+  SIGHT_PROVIDER_REASONING_EFFORT: z.enum(providerReasoningEfforts).optional(),
   SIGHT_REQUEST_TIMEOUT_MS: integerString(providerConfigDefaults.requestTimeoutMs, 1_000, 300_000),
   SIGHT_TRANSMIT_MAX_DIMENSION: integerString(imageConfigDefaults.transmitMaxDimension, 64, 32_768),
 });
@@ -339,6 +343,7 @@ export async function loadConfig(
     SIGHT_PROVIDER_BASE_URL: environment["SIGHT_PROVIDER_BASE_URL"],
     SIGHT_PROVIDER_MAX_TOKENS: environment["SIGHT_PROVIDER_MAX_TOKENS"],
     SIGHT_PROVIDER_MODEL: environment["SIGHT_PROVIDER_MODEL"],
+    SIGHT_PROVIDER_REASONING_EFFORT: environment["SIGHT_PROVIDER_REASONING_EFFORT"],
     SIGHT_REQUEST_TIMEOUT_MS: environment["SIGHT_REQUEST_TIMEOUT_MS"],
     SIGHT_TRANSMIT_MAX_DIMENSION: environment["SIGHT_TRANSMIT_MAX_DIMENSION"],
   });
@@ -402,6 +407,9 @@ export async function loadConfig(
     maxRetries,
     maxTokens,
     model: providerModel(result.data.SIGHT_PROVIDER_MODEL),
+    ...(result.data.SIGHT_PROVIDER_REASONING_EFFORT === undefined
+      ? {}
+      : { reasoningEffort: result.data.SIGHT_PROVIDER_REASONING_EFFORT }),
     requestTimeoutMs,
   });
 

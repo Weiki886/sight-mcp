@@ -12,6 +12,11 @@ Ollama, LM Studio, vLLM, and similar gateways. It sends a configured model, a sa
 message, one user text part, one `image_url` data URL, and `max_tokens`. It accepts only a non-empty
 `choices[0].message.content` string or documented text-part array.
 
+When `SIGHT_PROVIDER_REASONING_EFFORT` is set, the adapter also sends the validated value as the
+top-level `reasoning_effort` field. When it is unset, that field is omitted so existing Providers
+see the original minimum request. Model-specific effort mappings remain the Provider's
+responsibility.
+
 This follows the official OpenAI
 [Create chat completion API reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create),
 which documents text/image user content and base64 image data in `image_url`. Sight MCP deliberately
@@ -28,6 +33,21 @@ does not use vendor-specific response fields or an OpenAI SDK, keeping the domai
 - Redirects are returned as a sanitized Provider failure and are never followed.
 - There is no fallback endpoint, automatic Provider switching, proxy discovery, or URL supplied by
   model/tool input.
+
+## Documented live-test targets
+
+The initial live-test targets for Issue #14 are:
+
+| Role               | Base URL                                                                    | Model                          | Suggested effort |
+| ------------------ | --------------------------------------------------------------------------- | ------------------------------ | ---------------- |
+| Primary            | `https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash`                | `low`            |
+| Manual alternative | `https://api.deepseek.com`                                                  | `deepseek-v4-flash-vision-exp` | `low`            |
+
+Replace `YOUR_WORKSPACE_ID` with the Alibaba Cloud Model Studio workspace identifier. Both targets
+use the same `SIGHT_PROVIDER_API_KEY` process variable; the key must belong to the selected
+endpoint. Switching is an explicit restart-time configuration change. Sight MCP never transmits an
+image to a second Provider after an error. The DeepSeek target is experimental and must not be
+treated as a stable compatibility guarantee until the release validation matrix passes.
 
 ## Bounds and retries
 
