@@ -1,13 +1,13 @@
 {
   "name": "@weiki886/sight-mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "A secure MCP vision bridge for text-only coding agents.",
   "license": "MIT",
   "author": "Weiki886",
   "type": "module",
-  "private": true,
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "bin": {
     "sight-mcp": "./dist/cli.js"
@@ -32,15 +32,19 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/mark-executable.mjs",
     "audit:prod": "pnpm audit --prod --audit-level high",
-    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:integration && pnpm pack:check && pnpm audit:prod",
+    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:integration && pnpm pack:check && pnpm audit:prod && pnpm licenses:check && pnpm workflow:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "licenses:check": "node scripts/check-licenses.mjs",
     "lint": "eslint . --max-warnings 0",
     "pack:check": "node scripts/check-pack.mjs",
+    "release:candidate": "node scripts/create-release-candidate.mjs",
+    "release:host-smoke": "node scripts/run-host-smoke.mjs",
     "start": "node dist/cli.js",
     "test": "vitest run tests/unit tests/contract tests/security",
     "test:integration": "vitest run tests/integration",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "workflow:check": "node scripts/check-workflow-security.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
