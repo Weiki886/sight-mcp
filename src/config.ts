@@ -33,6 +33,11 @@ export const providerConfigDefaults = Object.freeze({
   requestTimeoutMs: 60_000,
 });
 
+export const executionConfigDefaults = Object.freeze({
+  maxConcurrency: 2,
+  maxQueueSize: 8,
+});
+
 const providerApiKeyBrand: unique symbol = Symbol("ProviderApiKey");
 
 export interface ProviderApiKey {
@@ -65,10 +70,16 @@ export interface ImageConfig {
 }
 
 export interface AppConfig {
+  readonly execution: ExecutionConfig;
   readonly image: ImageConfig;
   readonly logLevel: LogLevel;
   readonly provider: ProviderConfig;
   readonly warnings: readonly ConfigWarning[];
+}
+
+export interface ExecutionConfig {
+  readonly maxConcurrency: number;
+  readonly maxQueueSize: number;
 }
 
 export interface ConfigLoadOptions {
@@ -96,6 +107,7 @@ const environmentSchema = z.object({
   SIGHT_ALLOWED_ROOTS: z.string().optional(),
   SIGHT_JPEG_QUALITY: integerString(imageConfigDefaults.jpegQuality, 40, 95),
   SIGHT_LOG_LEVEL: z.enum(logLevels).default("info"),
+  SIGHT_MAX_CONCURRENCY: integerString(executionConfigDefaults.maxConcurrency, 1, 16),
   SIGHT_MAX_IMAGE_BYTES: integerString(imageConfigDefaults.maxImageBytes, 1, 104_857_600),
   SIGHT_MAX_IMAGE_DIMENSION: integerString(imageConfigDefaults.maxImageDimension, 1, 32_768),
   SIGHT_MAX_IMAGE_PIXELS: integerString(imageConfigDefaults.maxImagePixels, 1, 100_000_000),
@@ -106,6 +118,7 @@ const environmentSchema = z.object({
     1_024,
     10_485_760,
   ),
+  SIGHT_MAX_QUEUE_SIZE: integerString(executionConfigDefaults.maxQueueSize, 0, 128),
   SIGHT_MAX_RETRIES: integerString(providerConfigDefaults.maxRetries, 0, 5),
   SIGHT_PROVIDER_API_KEY: z.string().optional(),
   SIGHT_PROVIDER_BASE_URL: z.string(),
@@ -313,11 +326,13 @@ export async function loadConfig(
     SIGHT_ALLOWED_ROOTS: environment["SIGHT_ALLOWED_ROOTS"],
     SIGHT_JPEG_QUALITY: environment["SIGHT_JPEG_QUALITY"],
     SIGHT_LOG_LEVEL: environment["SIGHT_LOG_LEVEL"],
+    SIGHT_MAX_CONCURRENCY: environment["SIGHT_MAX_CONCURRENCY"],
     SIGHT_MAX_IMAGE_BYTES: environment["SIGHT_MAX_IMAGE_BYTES"],
     SIGHT_MAX_IMAGE_DIMENSION: environment["SIGHT_MAX_IMAGE_DIMENSION"],
     SIGHT_MAX_IMAGE_PIXELS: environment["SIGHT_MAX_IMAGE_PIXELS"],
     SIGHT_MAX_OUTPUT_CHARS: environment["SIGHT_MAX_OUTPUT_CHARS"],
     SIGHT_MAX_PROVIDER_RESPONSE_BYTES: environment["SIGHT_MAX_PROVIDER_RESPONSE_BYTES"],
+    SIGHT_MAX_QUEUE_SIZE: environment["SIGHT_MAX_QUEUE_SIZE"],
     SIGHT_MAX_RETRIES: environment["SIGHT_MAX_RETRIES"],
     SIGHT_MAX_TRANSMIT_BYTES: environment["SIGHT_MAX_TRANSMIT_BYTES"],
     SIGHT_PROVIDER_API_KEY: environment["SIGHT_PROVIDER_API_KEY"],
@@ -337,8 +352,10 @@ export async function loadConfig(
     SIGHT_MAX_IMAGE_BYTES: maxImageBytes,
     SIGHT_MAX_IMAGE_DIMENSION: maxImageDimension,
     SIGHT_MAX_IMAGE_PIXELS: maxImagePixels,
+    SIGHT_MAX_CONCURRENCY: maxConcurrency,
     SIGHT_MAX_OUTPUT_CHARS: maxOutputChars,
     SIGHT_MAX_PROVIDER_RESPONSE_BYTES: maxResponseBytes,
+    SIGHT_MAX_QUEUE_SIZE: maxQueueSize,
     SIGHT_MAX_RETRIES: maxRetries,
     SIGHT_MAX_TRANSMIT_BYTES: maxTransmitBytes,
     SIGHT_PROVIDER_MAX_TOKENS: maxTokens,
@@ -374,6 +391,7 @@ export async function loadConfig(
     maxTransmitBytes,
     transmitMaxDimension,
   });
+  const execution: ExecutionConfig = Object.freeze({ maxConcurrency, maxQueueSize });
   const providerUrls = normalizeProviderUrls(result.data.SIGHT_PROVIDER_BASE_URL);
   const apiKey = providerApiKey(result.data.SIGHT_PROVIDER_API_KEY);
   const provider: ProviderConfig = Object.freeze({
@@ -388,6 +406,7 @@ export async function loadConfig(
   });
 
   return Object.freeze({
+    execution,
     image,
     logLevel: result.data.SIGHT_LOG_LEVEL,
     provider,

@@ -24,7 +24,7 @@ defines precedence and secret handling.
 
 The image-pipeline and logging variables are implemented by Issue #3. Provider URL/model/key,
 Provider response, retry, and timeout variables are implemented by Issue #4. Concurrency and queue
-variables remain normative v0.1.0 requirements for Issue #5 and are not silently consumed yet.
+variables are implemented by Issue #5 at the application-service boundary.
 
 | Variable                            | Required/default | Validation and purpose                                                                                                        |
 | ----------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |

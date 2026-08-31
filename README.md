@@ -3,21 +3,20 @@
 Sight MCP is a secure Model Context Protocol vision bridge for text-only models in Claude Code,
 Codex, and other MCP hosts.
 
-> [!IMPORTANT] The repository currently contains the TypeScript/MCP stdio foundation, secure local
-> image preprocessing, and the OpenAI-compatible Provider adapter tracked by
-> [Issue #4](https://github.com/Weiki886/sight-mcp/issues/4). It intentionally exposes no MCP tools
-> until the application service is connected in Issue #5.
+> [!IMPORTANT] The repository contains the TypeScript/MCP stdio server, secure local image
+> preprocessing, an OpenAI-compatible Provider adapter, and the public `analyze_image` Tool. Host
+> compatibility, packaging, and v0.1.0 release preparation remain tracked by Issue #6.
 
 ## v0.1.0 direction
 
-The first release will expose one stdio MCP tool:
+The first release exposes one stdio MCP tool:
 
 ```text
 analyze_image(path, prompt)
 ```
 
-The server will authorize and preprocess a local image, send the normalized image to an
-OpenAI-compatible vision endpoint, and return both readable text and structured metadata. Local
+The server authorizes and preprocesses a local image, sends the normalized image to an
+OpenAI-compatible vision endpoint, and returns both readable text and structured metadata. Local
 model gateways and remote providers use the same adapter contract.
 
 ## Development
@@ -61,10 +60,12 @@ as structured JSON.
 | `SIGHT_PROVIDER_BASE_URL`           | required   | Provider API root; HTTPS remote or HTTP exact loopback         |
 | `SIGHT_PROVIDER_MODEL`              | required   | Configured vision model identifier                             |
 | `SIGHT_PROVIDER_API_KEY`            | unset      | Optional Bearer credential; use a host-managed secret          |
-| `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`    | Overall Provider deadline                                      |
+| `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`    | Overall Tool deadline, including queue and Provider retries    |
 | `SIGHT_PROVIDER_MAX_TOKENS`         | `4096`     | Provider answer-token request cap                              |
 | `SIGHT_MAX_PROVIDER_RESPONSE_BYTES` | `1048576`  | Maximum Provider response bytes                                |
 | `SIGHT_MAX_OUTPUT_CHARS`            | `32000`    | Maximum returned answer characters                             |
+| `SIGHT_MAX_CONCURRENCY`             | `2`        | Maximum simultaneously active analyses                         |
+| `SIGHT_MAX_QUEUE_SIZE`              | `8`        | Maximum waiting analyses; zero disables queueing               |
 | `SIGHT_MAX_RETRIES`                 | `2`        | Retries after the initial eligible Provider attempt            |
 | `SIGHT_LOG_LEVEL`                   | `info`     | `silent`, `error`, `warn`, `info`, or `debug`                  |
 
@@ -89,8 +90,8 @@ operator's responsibility. Prefer an exact-loopback Provider when images must re
 
 Project planning is tracked in the
 [`v0.1.0 — MVP`](https://github.com/Weiki886/sight-mcp/milestone/1) milestone. Secure local image
-handling and the OpenAI-compatible vision Provider are implemented locally; the `analyze_image` tool
-will be delivered by a subsequent Issue.
+handling, the OpenAI-compatible vision Provider, and the `analyze_image` Tool are implemented. Host
+compatibility and release readiness remain before v0.1.0 publication.
 
 ## License
 

@@ -1,6 +1,11 @@
 import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 
+import { createAnalyzeImageService } from "../application/analyze-image.js";
+import { createBoundedWorkQueue } from "../application/bounded-work-queue.js";
 import type { AppConfig } from "../config.js";
+import { createNodeInputGuard } from "../infrastructure/filesystem/node-input-guard.js";
+import { createSharpImagePipeline } from "../infrastructure/image/sharp-image-pipeline.js";
+import { createOpenAICompatibleProvider } from "../infrastructure/provider/openai-compatible-provider.js";
 import type { Logger } from "../logger.js";
 import { SERVER_NAME, VERSION } from "../version.js";
 import { createServer } from "./create-server.js";
@@ -16,7 +21,19 @@ export function startStdioServer(config: AppConfig, logger: Logger): StdioServer
     version: VERSION,
   });
 
-  return serveStdio(createServer, {
+  const inputGuard = createNodeInputGuard(config.image);
+  const pipeline = createSharpImagePipeline(config.image);
+  const provider = createOpenAICompatibleProvider(config.provider, { logger });
+  const queue = createBoundedWorkQueue(
+    config.execution.maxConcurrency,
+    config.execution.maxQueueSize,
+  );
+  const analyzeImage = createAnalyzeImageService(
+    { inputGuard, logger, pipeline, provider, queue },
+    config.provider,
+  );
+
+  return serveStdio(() => createServer(analyzeImage), {
     onerror: (error) => {
       logger.error("MCP transport error", { errorName: error.name });
     },
