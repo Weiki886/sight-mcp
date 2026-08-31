@@ -324,6 +324,13 @@ try {
   if (!/^[0-9a-f]{40}$/u.test(sourceCommit)) {
     throw new Error("SOURCE_COMMIT must be a full Git commit SHA.");
   }
+  try {
+    await execFileAsync("git", ["cat-file", "-e", `${sourceCommit}^{commit}`], {
+      cwd: projectRoot,
+    });
+  } catch {
+    throw new Error("SOURCE_COMMIT must identify a commit available in this checkout.");
+  }
   const generatedAt = new Date().toISOString();
   const manifest = Object.freeze({
     artifact: Object.freeze({
