@@ -1,9 +1,9 @@
 # v0.1.0 release-candidate smoke record
 
 - Executed: 2026-08-31 (Asia/Shanghai)
-- Package: `@weiki886/sight-mcp@0.1.0`
+- Package: `@weiki/sight-mcp@0.1.0`
 - Candidate implementation commit: `621d42418b8b584e3067f2def30f73397b248ca6`
-- Candidate file: `weiki886-sight-mcp-0.1.0.tgz`
+- Candidate file: `weiki-sight-mcp-0.1.0.tgz`
 - SHA-256: `fdbf97569c73803eb55aaaeeb1765e181c1cf4f8c66829bae66e709cb436d8e5`
 - Provider: local synthetic OpenAI-compatible endpoint; no Provider credential
 - Fixture: generated synthetic PNG; no personal or repository image

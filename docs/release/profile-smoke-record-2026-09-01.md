@@ -2,7 +2,7 @@
 
 - Executed: 2026-09-01 (Asia/Shanghai)
 - Scope: Issue #16 pre-merge validation; not a publication candidate
-- Package: locally packed `@weiki886/sight-mcp@0.1.0`
+- Package: locally packed `@weiki/sight-mcp@0.1.0`
 - Package SHA-256: `cc0eba90a68e8a5d4a122af0b0a337a0ce0302aceeb8f2f0c82cad7a5e13ca1a`
 - Fixture: generated synthetic chart PNG; no personal or repository image
 - Credentials: user-authorized local credentials; values and request bodies not recorded

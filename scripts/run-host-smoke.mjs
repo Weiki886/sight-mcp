@@ -310,7 +310,7 @@ try {
   const cliPath = join(
     installDirectory,
     "node_modules",
-    "@weiki886",
+    "@weiki",
     "sight-mcp",
     "dist",
     "cli.js",

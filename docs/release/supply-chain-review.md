@@ -6,7 +6,7 @@
 
 ## Package boundary
 
-- Distribution identity is only `@weiki886/sight-mcp`; commands never install the unrelated unscoped
+- Distribution identity is only `@weiki/sight-mcp`; commands never install the unrelated unscoped
   `sight-mcp` package.
 - Metadata is version `0.1.0`, MIT, public access, Node.js 22+, exact repository URL, and provenance
   enabled. `private` is absent so an approved publish is technically possible.
@@ -51,7 +51,7 @@ uses PR review and required observed CI before merge, but maintainers should ena
 required checks and dependency updates as a separate governance change. These gaps do not authorize
 bypassing the release approval checklist.
 
-npm registry lookup returned `E404` for `@weiki886/sight-mcp`, but this workstation had no npm
-authentication and npm could not establish access to `@weiki886`. Package-name absence is therefore
+npm registry lookup returned `E404` for `@weiki/sight-mcp`, but this workstation had no npm
+authentication and npm could not establish access to `@weiki`. Package-name absence is therefore
 recorded; ownership/publishability is not accepted until the authenticated checks in the release
 runbook pass.

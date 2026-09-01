@@ -150,7 +150,7 @@ async function runInstalledSmoke(archivePath, installDirectory) {
   }
 
   const installedPackageRoot = await realpath(
-    join(installDirectory, "node_modules", "@weiki886", "sight-mcp"),
+    join(installDirectory, "node_modules", "@weiki", "sight-mcp"),
   );
   const cliPath = join(installedPackageRoot, "dist", "cli.js");
   const transport = new StdioClientTransport({
@@ -349,7 +349,7 @@ try {
   const manifest = Object.freeze({
     artifact: Object.freeze({
       file: basename(archivePath),
-      packageName: "@weiki886/sight-mcp",
+      packageName: "@weiki/sight-mcp",
       sha256: digest,
       version: "0.1.0",
     }),

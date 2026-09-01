@@ -1,5 +1,5 @@
 {
-  "name": "@weiki886/sight-mcp",
+  "name": "@weiki/sight-mcp",
   "version": "0.1.0",
   "description": "A secure MCP vision bridge for text-only coding agents.",
   "license": "MIT",
@@ -10,7 +10,7 @@
     "provenance": true
   },
   "bin": {
-    "sight-mcp": "./dist/cli.js"
+    "sight-mcp": "dist/cli.js"
   },
   "files": [
     "dist",

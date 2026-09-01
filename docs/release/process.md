@@ -23,7 +23,7 @@ That command builds once, runs `pnpm pack` once, calculates SHA-256, installs th
 an empty temporary directory, calls its packed CLI through the official MCP client, and creates an
 npm-generated CycloneDX SBOM. The uploaded artifact contains only:
 
-- `weiki886-sight-mcp-0.1.0.tgz`;
+- `weiki-sight-mcp-0.1.0.tgz`;
 - `release-manifest.json` with source commit and digest;
 - `clean-install-smoke.json` with sanitized scenario results;
 - `sight-mcp-0.1.0.sbom.cdx.json`.
@@ -39,8 +39,8 @@ Before publication, the maintainer must verify all of the following against one 
 1. CI quality jobs pass on Node.js 22 and 24.
 2. Candidate manifest `source.commit` is the reviewed `main` commit.
 3. Local SHA-256 equals `artifact.sha256`.
-4. `gh attestation verify weiki886-sight-mcp-0.1.0.tgz --repo Weiki886/sight-mcp` succeeds.
-5. The CycloneDX SBOM identifies `@weiki886/sight-mcp@0.1.0` and its installed production tree.
+4. `gh attestation verify weiki-sight-mcp-0.1.0.tgz --repo Weiki886/sight-mcp` succeeds.
+5. The CycloneDX SBOM identifies `@weiki/sight-mcp@0.1.0` and its installed production tree.
 6. Claude Code and Codex Host records pass for that digest. For a candidate containing Issue #16,
    the live Qwen/DeepSeek profile records must also pass for that digest without placing credentials
    in Host config or command arguments.
@@ -50,20 +50,20 @@ Before publication, the maintainer must verify all of the following against one 
 
    ```sh
    npm whoami
-   npm access list packages @weiki886 --json
-   npm view @weiki886/sight-mcp name version --json
-   npm publish weiki886-sight-mcp-0.1.0.tgz --dry-run --access public
+   npm access list packages @weiki --json
+   npm view @weiki/sight-mcp name version --json
+   npm publish weiki-sight-mcp-0.1.0.tgz --dry-run --access public
    ```
 
    The expected first-release registry lookup is `E404`, but `npm whoami` and scope access must
-   establish that the operator controls `@weiki886`. An unauthenticated `E404` alone is not proof.
+   establish that the operator controls `@weiki`. An unauthenticated `E404` alone is not proof.
 
 9. The npm account has 2FA or a configured trusted publisher. For GitHub trusted publishing, the
    public package and repository mapping must be exact and npm will generate package provenance.
 10. A human explicitly approves npm publish, Tag, and GitHub Release after reviewing these items.
 
 At preparation time on 2026-08-31, the package registry returned `E404`, this workstation was not
-authenticated to npm, and the `@weiki886` scope could not be proven. Publication therefore remains
+authenticated to npm, and the `@weiki` scope could not be proven. Publication therefore remains
 blocked even though candidate engineering can be merged.
 
 ## Publication sequence after approval
@@ -71,7 +71,7 @@ blocked even though candidate engineering can be merged.
 1. Download the already-attested `main` candidate artifact; do not run `pnpm pack` again.
 2. Recalculate SHA-256 and verify GitHub provenance.
 3. Publish the exact `.tgz` through the approved npm identity/trusted-publisher path.
-4. Verify `npm view @weiki886/sight-mcp@0.1.0 dist.integrity dist.tarball` and perform a clean
+4. Verify `npm view @weiki/sight-mcp@0.1.0 dist.integrity dist.tarball` and perform a clean
    registry install plus discovery call.
 5. Create signed/verified tag `v0.1.0` on the manifest source commit.
 6. Create the GitHub Release from that tag using [the prepared notes](v0.1.0.md), attach the exact
@@ -88,7 +88,7 @@ Before publication, reject the candidate and fix forward on a reviewed commit. A
 never overwrite or reuse `0.1.0`:
 
 1. stop promoting the affected artifact and document impact;
-2. use `npm deprecate @weiki886/sight-mcp@0.1.0 "<concise reason and safe version>"` only with
+2. use `npm deprecate @weiki/sight-mcp@0.1.0 "<concise reason and safe version>"` only with
    explicit maintainer approval;
 3. prepare a reviewed patch version with a new digest, SBOM, attestations, and both Host records;
 4. publish the patch and update the GitHub advisory/release notes as appropriate.

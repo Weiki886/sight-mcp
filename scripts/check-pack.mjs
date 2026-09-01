@@ -78,8 +78,8 @@ async function verifyArchive(archivePath) {
   const packedPackageJson = JSON.parse(
     (await archiveContents(archivePath, "package/package.json")).toString("utf8"),
   );
-  if (packedPackageJson.name !== "@weiki886/sight-mcp") {
-    throw new Error("Package name must remain @weiki886/sight-mcp.");
+  if (packedPackageJson.name !== "@weiki/sight-mcp") {
+    throw new Error("Package name must remain @weiki/sight-mcp.");
   }
   if (packedPackageJson.version !== "0.1.0" || rootPackageJson.version !== "0.1.0") {
     throw new Error("Release candidate version must be 0.1.0.");
@@ -155,7 +155,7 @@ try {
     await execFileAsync(pnpmCommand, ["pack", "--pack-destination", temporaryDirectory], {
       cwd: projectRoot,
     });
-    archivePath = join(temporaryDirectory, "weiki886-sight-mcp-0.1.0.tgz");
+    archivePath = join(temporaryDirectory, "weiki-sight-mcp-0.1.0.tgz");
   }
   await access(archivePath);
   await verifyArchive(archivePath);

@@ -15,12 +15,12 @@ Provider, gives each Host an isolated MCP configuration, and discards raw Host o
 ```sh
 pnpm release:host-smoke -- \
   --host claude-code \
-  --archive /absolute/path/to/weiki886-sight-mcp-0.1.0.tgz \
+  --archive /absolute/path/to/weiki-sight-mcp-0.1.0.tgz \
   --record /absolute/path/to/claude-code-smoke.json
 
 pnpm release:host-smoke -- \
   --host codex \
-  --archive /absolute/path/to/weiki886-sight-mcp-0.1.0.tgz \
+  --archive /absolute/path/to/weiki-sight-mcp-0.1.0.tgz \
   --record /absolute/path/to/codex-smoke.json
 ```
 
@@ -50,7 +50,7 @@ secret manager; never put it in the runner arguments or a committed file.
 ```sh
 pnpm release:host-smoke -- \
   --host claude-code \
-  --archive /absolute/path/to/weiki886-sight-mcp-0.1.0.tgz \
+  --archive /absolute/path/to/weiki-sight-mcp-0.1.0.tgz \
   --record /absolute/path/to/claude-qwen-profile.json \
   --profile qwen
 ```

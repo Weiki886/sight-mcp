@@ -18,7 +18,7 @@ grants the language model an unrestricted file reader.
 After v0.1.0 is published, hosts should run the immutable scoped version:
 
 ```sh
-npx -y @weiki886/sight-mcp@0.1.0
+npx -y @weiki/sight-mcp@0.1.0
 ```
 
 The unrelated unscoped `sight-mcp` package is not this project. During release-candidate testing,
@@ -31,9 +31,9 @@ directly, so the key does not appear in the command, shell history, MCP host con
 repository `.env` file:
 
 ```sh
-npx -y @weiki886/sight-mcp@0.1.0 credentials set qwen
-npx -y @weiki886/sight-mcp@0.1.0 credentials set deepseek
-npx -y @weiki886/sight-mcp@0.1.0 credentials status
+npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
+npx -y @weiki/sight-mcp@0.1.0 credentials set deepseek
+npx -y @weiki/sight-mcp@0.1.0 credentials status
 ```
 
 Only configure the Provider you use. `credentials status [qwen|deepseek]` reports `configured` or
@@ -56,7 +56,7 @@ key:
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki886/sight-mcp@0.1.0", "--provider", "qwen"],
+      "args": ["-y", "@weiki/sight-mcp@0.1.0", "--provider", "qwen"],
       "env": {
         "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images"
       }
@@ -79,7 +79,7 @@ Codex reads user configuration from `~/.codex/config.toml`; a trusted project ma
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki886/sight-mcp@0.1.0", "--provider", "qwen"]
+args = ["-y", "@weiki/sight-mcp@0.1.0", "--provider", "qwen"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
