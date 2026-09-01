@@ -2,13 +2,20 @@ import { Writable } from "node:stream";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createAnalyzeImageService } from "../../src/application/analyze-image.js";
+import {
+  createAnalyzeClipboardImageService,
+  createAnalyzeImageService,
+} from "../../src/application/analyze-image.js";
 import { createBoundedWorkQueue } from "../../src/application/bounded-work-queue.js";
-import type { AnalyzeImageDependencies } from "../../src/application/analyze-image.js";
+import type {
+  AnalyzeClipboardImageDependencies,
+  AnalyzeImageDependencies,
+} from "../../src/application/analyze-image.js";
 import {
   imageFailure,
   imageSuccess,
   type AuthorizedImage,
+  type ClipboardImageReader,
   type PreparedImage,
 } from "../../src/domain/image.js";
 import {
@@ -65,6 +72,38 @@ function dependencies(overrides: Partial<AnalyzeImageDependencies> = {}): Analyz
 
 function request(signal: AbortSignal = new AbortController().signal) {
   return { path: "/authorized/image.png", prompt: "Describe it", signal };
+}
+
+function clipboardDependencies(
+  overrides: Partial<AnalyzeClipboardImageDependencies> = {},
+): AnalyzeClipboardImageDependencies {
+  return {
+    clipboardReader: {
+      read: () => Promise.resolve(imageSuccess(authorizedImage)),
+    },
+    logger: silentLogger,
+    pipeline: {
+      prepare: () => Promise.resolve(imageSuccess(preparedImage)),
+    },
+    provider: {
+      analyze: () =>
+        Promise.resolve(
+          providerSuccess({
+            model: "vision-model",
+            providerName: "openai-compatible",
+            text: "A safe description.",
+            usage: { inputTokens: 10, outputTokens: 4, totalTokens: 14 },
+            warnings: ["ANSWER_TRUNCATED"],
+          }),
+        ),
+    },
+    queue: createBoundedWorkQueue(1, 1),
+    ...overrides,
+  };
+}
+
+function clipboardRequest(signal: AbortSignal = new AbortController().signal) {
+  return { prompt: "Describe the clipboard", signal };
 }
 
 describe("AnalyzeImage service", () => {
@@ -314,4 +353,67 @@ describe("AnalyzeImage service", () => {
     expect(logs).not.toContain(canary);
     expect(logs).toContain("request-sanitized");
   });
+});
+
+describe("AnalyzeClipboardImage service", () => {
+  it("reads the clipboard and returns locally generated structured metadata", async () => {
+    const read = vi.fn<ClipboardImageReader["read"]>(() =>
+      Promise.resolve(imageSuccess(authorizedImage)),
+    );
+    const service = createAnalyzeClipboardImageService(
+      clipboardDependencies({ clipboardReader: { read } }),
+      { requestTimeoutMs: 1_000 },
+      { requestId: () => "request-clipboard" },
+    );
+
+    await expect(service.analyze(clipboardRequest())).resolves.toMatchObject({
+      answer: "A safe description.",
+      media: { transmittedBytes: 2 },
+      provider: { model: "vision-model", name: "openai-compatible" },
+      requestId: "request-clipboard",
+      status: "ok",
+    });
+    expect(read).toHaveBeenCalledOnce();
+    expect(read.mock.calls[0]?.[0]).toBeInstanceOf(AbortSignal);
+  });
+
+  it("maps clipboard access denial without calling the provider", async () => {
+    const provider = vi.fn<VisionProvider["analyze"]>();
+    const service = createAnalyzeClipboardImageService(
+      clipboardDependencies({
+        clipboardReader: {
+          read: () => Promise.resolve(imageFailure("CLIPBOARD_ACCESS_DENIED")),
+        },
+        provider: { analyze: provider },
+      }),
+      { requestTimeoutMs: 1_000 },
+      { requestId: () => "request-denied" },
+    );
+
+    await expect(service.analyze(clipboardRequest())).resolves.toMatchObject({
+      error: { code: "CLIPBOARD_ACCESS_DENIED" },
+      requestId: "request-denied",
+      status: "error",
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it.each(["CLIPBOARD_NO_IMAGE", "CLIPBOARD_READ_FAILED", "CLIPBOARD_UNAVAILABLE"] as const)(
+    "maps clipboard reader error %s without throwing",
+    async (code) => {
+      const service = createAnalyzeClipboardImageService(
+        clipboardDependencies({
+          clipboardReader: { read: () => Promise.resolve(imageFailure(code)) },
+        }),
+        { requestTimeoutMs: 1_000 },
+        { requestId: () => "request-error" },
+      );
+
+      await expect(service.analyze(clipboardRequest())).resolves.toMatchObject({
+        error: { code },
+        requestId: "request-error",
+        status: "error",
+      });
+    },
+  );
 });

@@ -174,8 +174,22 @@ async function runInstalledSmoke(archivePath, installDirectory) {
   try {
     await client.connect(transport);
     const listing = await client.listTools();
-    if (listing.tools.length !== 1 || listing.tools[0]?.name !== "analyze_image") {
-      throw new Error("Clean install did not discover exactly analyze_image.");
+    const discoveredTools = listing.tools
+      .map((tool) => tool.name)
+      .sort()
+      .join(",");
+    if (discoveredTools !== "analyze_clipboard_image,analyze_image") {
+      throw new Error(
+        "Clean install did not discover exactly analyze_image and analyze_clipboard_image.",
+      );
+    }
+
+    if (process.platform !== "darwin") {
+      const clipboardUnavailable = await client.callTool({
+        arguments: { prompt: "clipboard-smoke" },
+        name: "analyze_clipboard_image",
+      });
+      assertToolResult(clipboardUnavailable, "error", "CLIPBOARD_UNAVAILABLE");
     }
 
     const chart = await client.callTool({
