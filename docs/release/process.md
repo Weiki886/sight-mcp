@@ -71,8 +71,8 @@ blocked even though candidate engineering can be merged.
 1. Download the already-attested `main` candidate artifact; do not run `pnpm pack` again.
 2. Recalculate SHA-256 and verify GitHub provenance.
 3. Publish the exact `.tgz` through the approved npm identity/trusted-publisher path.
-4. Verify `npm view @weiki/sight-mcp@0.1.0 dist.integrity dist.tarball` and perform a clean
-   registry install plus discovery call.
+4. Verify `npm view @weiki/sight-mcp@0.1.0 dist.integrity dist.tarball` and perform a clean registry
+   install plus discovery call.
 5. Create signed/verified tag `v0.1.0` on the manifest source commit.
 6. Create the GitHub Release from that tag using [the prepared notes](v0.1.0.md), attach the exact
    tarball, manifest, SBOM, and verification instructions, then check every public link.
@@ -88,8 +88,8 @@ Before publication, reject the candidate and fix forward on a reviewed commit. A
 never overwrite or reuse `0.1.0`:
 
 1. stop promoting the affected artifact and document impact;
-2. use `npm deprecate @weiki/sight-mcp@0.1.0 "<concise reason and safe version>"` only with
-   explicit maintainer approval;
+2. use `npm deprecate @weiki/sight-mcp@0.1.0 "<concise reason and safe version>"` only with explicit
+   maintainer approval;
 3. prepare a reviewed patch version with a new digest, SBOM, attestations, and both Host records;
 4. publish the patch and update the GitHub advisory/release notes as appropriate.
 

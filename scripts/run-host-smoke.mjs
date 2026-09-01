@@ -307,14 +307,7 @@ try {
     providerBaseUrl = `http://127.0.0.1:${String(address.port)}/v1`;
   }
 
-  const cliPath = join(
-    installDirectory,
-    "node_modules",
-    "@weiki",
-    "sight-mcp",
-    "dist",
-    "cli.js",
-  );
+  const cliPath = join(installDirectory, "node_modules", "@weiki", "sight-mcp", "dist", "cli.js");
   const environment =
     profile === undefined
       ? {
