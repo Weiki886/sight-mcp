@@ -55,8 +55,8 @@ validated the synthetic title, values, and tallest bar.
 
 The deterministic local Host matrix was also rerun on both Claude Code and Codex with this same
 digest after the runner gained profile arguments. Discovery, chart, OCR-style, denied-path,
-Provider-failure, and active-cancellation scenarios all passed, confirming that generic
-no-argument mode and the existing Host runner remain compatible.
+Provider-failure, and active-cancellation scenarios all passed, confirming that generic no-argument
+mode and the existing Host runner remain compatible.
 
 The sanitized machine-readable records are local ignored artifacts. Raw Host output was discarded.
 No key, personal path, image bytes, complete prompt, Provider request/response body, or temporary
