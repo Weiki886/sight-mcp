@@ -11,6 +11,13 @@ import {
 
 import { z } from "zod";
 
+import type { CredentialReader } from "./credentials/credential-store.js";
+import {
+  providerProfile,
+  type ProviderProfile,
+  type ProviderProfileName,
+} from "./provider-profiles.js";
+
 export const logLevels = ["silent", "error", "warn", "info", "debug"] as const;
 export const providerReasoningEfforts = ["low", "medium", "high", "xhigh", "max"] as const;
 
@@ -86,8 +93,10 @@ export interface ExecutionConfig {
 }
 
 export interface ConfigLoadOptions {
+  readonly credentialReader?: CredentialReader;
   readonly cwd?: string;
   readonly pathDelimiter?: string;
+  readonly providerProfile?: ProviderProfileName;
 }
 
 export class ConfigError extends Error {
@@ -208,14 +217,49 @@ function normalizeProviderUrls(
   return Object.freeze({ baseUrl, completionUrl: `${baseUrl}/chat/completions` });
 }
 
-function providerApiKey(value: string | undefined): ProviderApiKey | undefined {
+function providerApiKey(
+  value: string | undefined,
+  variableName = "SIGHT_PROVIDER_API_KEY",
+): ProviderApiKey | undefined {
   if (value === undefined || value === "") {
     return undefined;
   }
   if (value.length > 8_192 || !isPrintableAsciiToken(value)) {
-    throw new ConfigError("SIGHT_PROVIDER_API_KEY is invalid.");
+    throw new ConfigError(`${variableName} is invalid.`);
   }
   return createProviderApiKey(value);
+}
+
+async function profileApiKey(
+  environment: Readonly<Record<string, string | undefined>>,
+  profile: ProviderProfile,
+  genericValue: string | undefined,
+  credentialReader: CredentialReader | undefined,
+): Promise<ProviderApiKey> {
+  const generic = providerApiKey(genericValue);
+  if (generic !== undefined) {
+    return generic;
+  }
+
+  const profileValue = environment[profile.apiKeyEnvironmentVariable];
+  const profileEnvironmentKey = providerApiKey(profileValue, profile.apiKeyEnvironmentVariable);
+  if (profileEnvironmentKey !== undefined) {
+    return profileEnvironmentKey;
+  }
+
+  let storedValue: string | undefined;
+  try {
+    storedValue = await credentialReader?.get(profile.keychainAccount);
+  } catch {
+    throw new ConfigError("macOS Keychain credential lookup failed.");
+  }
+  const storedKey = providerApiKey(storedValue, "macOS Keychain credential");
+  if (storedKey === undefined) {
+    throw new ConfigError(
+      `${profile.name} provider credential is not configured. Run sight-mcp credentials set ${profile.name}.`,
+    );
+  }
+  return storedKey;
 }
 
 function hasControlCharacter(value: string): boolean {
@@ -326,6 +370,8 @@ export async function loadConfig(
   environment: Readonly<Record<string, string | undefined>> = process.env,
   options: ConfigLoadOptions = {},
 ): Promise<AppConfig> {
+  const selectedProfile =
+    options.providerProfile === undefined ? undefined : providerProfile(options.providerProfile);
   const result = environmentSchema.safeParse({
     SIGHT_ALLOWED_ROOTS: environment["SIGHT_ALLOWED_ROOTS"],
     SIGHT_JPEG_QUALITY: environment["SIGHT_JPEG_QUALITY"],
@@ -340,10 +386,11 @@ export async function loadConfig(
     SIGHT_MAX_RETRIES: environment["SIGHT_MAX_RETRIES"],
     SIGHT_MAX_TRANSMIT_BYTES: environment["SIGHT_MAX_TRANSMIT_BYTES"],
     SIGHT_PROVIDER_API_KEY: environment["SIGHT_PROVIDER_API_KEY"],
-    SIGHT_PROVIDER_BASE_URL: environment["SIGHT_PROVIDER_BASE_URL"],
+    SIGHT_PROVIDER_BASE_URL: selectedProfile?.baseUrl ?? environment["SIGHT_PROVIDER_BASE_URL"],
     SIGHT_PROVIDER_MAX_TOKENS: environment["SIGHT_PROVIDER_MAX_TOKENS"],
-    SIGHT_PROVIDER_MODEL: environment["SIGHT_PROVIDER_MODEL"],
-    SIGHT_PROVIDER_REASONING_EFFORT: environment["SIGHT_PROVIDER_REASONING_EFFORT"],
+    SIGHT_PROVIDER_MODEL: selectedProfile?.model ?? environment["SIGHT_PROVIDER_MODEL"],
+    SIGHT_PROVIDER_REASONING_EFFORT:
+      environment["SIGHT_PROVIDER_REASONING_EFFORT"] ?? selectedProfile?.reasoningEffort,
     SIGHT_REQUEST_TIMEOUT_MS: environment["SIGHT_REQUEST_TIMEOUT_MS"],
     SIGHT_TRANSMIT_MAX_DIMENSION: environment["SIGHT_TRANSMIT_MAX_DIMENSION"],
   });
@@ -398,7 +445,15 @@ export async function loadConfig(
   });
   const execution: ExecutionConfig = Object.freeze({ maxConcurrency, maxQueueSize });
   const providerUrls = normalizeProviderUrls(result.data.SIGHT_PROVIDER_BASE_URL);
-  const apiKey = providerApiKey(result.data.SIGHT_PROVIDER_API_KEY);
+  const apiKey =
+    selectedProfile === undefined
+      ? providerApiKey(result.data.SIGHT_PROVIDER_API_KEY)
+      : await profileApiKey(
+          environment,
+          selectedProfile,
+          result.data.SIGHT_PROVIDER_API_KEY,
+          options.credentialReader,
+        );
   const provider: ProviderConfig = Object.freeze({
     ...(apiKey === undefined ? {} : { apiKey }),
     ...providerUrls,

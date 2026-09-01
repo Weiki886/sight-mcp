@@ -12,6 +12,7 @@ grants the language model an unrestricted file reader.
 
 - Node.js 22 or newer
 - An OpenAI-compatible endpoint with a vision-capable model (local or remote)
+- macOS for native Keychain storage; environment-based configuration remains portable
 
 After v0.1.0 is published, hosts should run the immutable scoped version:
 
@@ -22,11 +23,31 @@ npx -y @weiki886/sight-mcp@0.1.0
 The unrelated unscoped `sight-mcp` package is not this project. During release-candidate testing,
 install and invoke the generated `.tgz` instead of substituting another package name.
 
+## Recommended macOS setup
+
+Store each remote Provider key once in macOS Keychain. The system command prompts for the secret
+directly, so the key does not appear in the command, shell history, MCP host configuration, or a
+repository `.env` file:
+
+```sh
+npx -y @weiki886/sight-mcp@0.1.0 credentials set qwen
+npx -y @weiki886/sight-mcp@0.1.0 credentials set deepseek
+npx -y @weiki886/sight-mcp@0.1.0 credentials status
+```
+
+Only configure the Provider you use. `credentials status [qwen|deepseek]` reports `configured` or
+`missing` without reading the stored password. To remove one item, run
+`credentials delete qwen|deepseek`; deletion asks for confirmation unless `--yes` is explicit.
+
+Start the server with `--provider qwen` or `--provider deepseek`. The profile binds the reviewed API
+root, model, default reasoning effort, and matching Keychain account. Switching the argument and
+restarting the host switches Provider; Sight MCP never falls back automatically.
+
 ## Claude Code configuration
 
 Claude Code supports local stdio servers at local, project, and user scopes. A project configuration
-is `.mcp.json` in the project root; use only placeholders or environment expansion in a committed
-file:
+is `.mcp.json` in the project root. On macOS, the recommended profile configuration contains no API
+key:
 
 ```json
 {
@@ -34,12 +55,9 @@ file:
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki886/sight-mcp@0.1.0"],
+      "args": ["-y", "@weiki886/sight-mcp@0.1.0", "--provider", "qwen"],
       "env": {
-        "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images",
-        "SIGHT_PROVIDER_BASE_URL": "http://127.0.0.1:11434/v1",
-        "SIGHT_PROVIDER_MODEL": "your-vision-model",
-        "SIGHT_PROVIDER_API_KEY": "${SIGHT_PROVIDER_API_KEY}"
+        "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images"
       }
     }
   }
@@ -47,30 +65,25 @@ file:
 ```
 
 For a private user-scoped entry, pass the same server object to
-`claude mcp add-json --scope user sight-mcp '<json>'`. Export `SIGHT_PROVIDER_API_KEY` in the
-environment that launches Claude Code; do not place a real key in `.mcp.json`, shell history, or the
-repository. Verify with `claude mcp get sight-mcp`, `claude mcp list`, or `/mcp`. See the
+`claude mcp add-json --scope user sight-mcp '<json>'`. Verify with `claude mcp get sight-mcp`,
+`claude mcp list`, or `/mcp`. See the
 [official Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for current scope and
 CLI behavior.
 
 ## Codex configuration
 
 Codex reads user configuration from `~/.codex/config.toml`; a trusted project may instead use
-`.codex/config.toml`. Keep the credential in the launching environment and inherit it with
-`env_vars`:
+`.codex/config.toml`. On macOS, select the profile in `args` and leave the credential in Keychain:
 
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki886/sight-mcp@0.1.0"]
-env_vars = ["SIGHT_PROVIDER_API_KEY"]
+args = ["-y", "@weiki886/sight-mcp@0.1.0", "--provider", "qwen"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
 [mcp_servers.sight-mcp.env]
 SIGHT_ALLOWED_ROOTS = "/absolute/path/to/allowed/images"
-SIGHT_PROVIDER_BASE_URL = "http://127.0.0.1:11434/v1"
-SIGHT_PROVIDER_MODEL = "your-vision-model"
 ```
 
 Use `codex mcp list` to verify discovery and `/mcp` inside Codex to inspect the connection. The tool
@@ -103,9 +116,11 @@ analyze_image(path, prompt)
 | `SIGHT_TRANSMIT_MAX_DIMENSION`      | `2048`     | Maximum normalized width or height, without enlargement        |
 | `SIGHT_MAX_TRANSMIT_BYTES`          | `10485760` | Maximum normalized image bytes                                 |
 | `SIGHT_JPEG_QUALITY`                | `85`       | Opaque JPEG quality, from 40 through 95                        |
-| `SIGHT_PROVIDER_BASE_URL`           | required   | Provider API root; HTTPS remote or HTTP exact loopback         |
-| `SIGHT_PROVIDER_MODEL`              | required   | Configured vision model identifier                             |
+| `SIGHT_PROVIDER_BASE_URL`           | required*  | Provider API root; HTTPS remote or HTTP exact loopback         |
+| `SIGHT_PROVIDER_MODEL`              | required*  | Configured vision model identifier                             |
 | `SIGHT_PROVIDER_API_KEY`            | unset      | Optional Bearer credential inherited from the host             |
+| `SIGHT_QWEN_API_KEY`                | unset      | Optional `--provider qwen` environment credential              |
+| `SIGHT_DEEPSEEK_API_KEY`            | unset      | Optional `--provider deepseek` environment credential          |
 | `SIGHT_PROVIDER_REASONING_EFFORT`   | unset      | Optional `low`, `medium`, `high`, `xhigh`, or `max`            |
 | `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`    | Overall Tool deadline, including queue and Provider retries    |
 | `SIGHT_PROVIDER_MAX_TOKENS`         | `4096`     | Provider answer-token request cap                              |
@@ -122,28 +137,49 @@ WebP are recognized from content rather than filename extension. Animated or uns
 rejected. Images are orientation-corrected, stripped of metadata, resized without enlargement, and
 encoded as JPEG when opaque or PNG when transparency is required.
 
+`*` `SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL` are required only in generic no-argument
+mode. A built-in `--provider` profile supplies both as one fixed pair.
+
 ### Recommended domestic vision Providers
 
-Use Qwen 3.8 Flash as the primary Provider:
+Use the Qwen 3.8 Flash profile as the primary Provider:
 
 ```text
-SIGHT_PROVIDER_BASE_URL=https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
-SIGHT_PROVIDER_MODEL=qwen3.8-flash
-SIGHT_PROVIDER_REASONING_EFFORT=low
+--provider qwen
 ```
 
 Use DeepSeek V4 Flash Vision Exp as a manually selected alternative:
 
 ```text
-SIGHT_PROVIDER_BASE_URL=https://api.deepseek.com
-SIGHT_PROVIDER_MODEL=deepseek-v4-flash-vision-exp
-SIGHT_PROVIDER_REASONING_EFFORT=low
+--provider deepseek
 ```
 
-In both cases, provide the selected service's credential through `SIGHT_PROVIDER_API_KEY` in the
-environment that launches Claude Code or Codex. Do not paste a real key into these examples, a
-tracked `.mcp.json`, `config.toml`, `.env` file, shell script, Issue, or log. The alternative is not
-an automatic fallback: change all three Provider values together and restart the MCP host.
+The profiles use `https://dashscope.aliyuncs.com/compatible-mode/v1` with `qwen3.8-flash`, and
+`https://api.deepseek.com` with `deepseek-v4-flash-vision-exp`; both default to `low` reasoning
+effort. Keychain is preferred on macOS. For Linux, Windows, CI, or a deliberately ephemeral
+override, set `SIGHT_QWEN_API_KEY`, `SIGHT_DEEPSEEK_API_KEY`, or the higher-precedence generic
+`SIGHT_PROVIDER_API_KEY` in the host process environment. Never paste a real key into a tracked
+`.mcp.json`, `config.toml`, `.env`, shell script, Issue, or log.
+
+Generic no-argument mode remains available for a local or another OpenAI-compatible endpoint:
+
+```text
+SIGHT_PROVIDER_BASE_URL=http://127.0.0.1:11434/v1
+SIGHT_PROVIDER_MODEL=your-vision-model
+SIGHT_PROVIDER_API_KEY=optional-for-local-endpoints
+```
+
+### Migrating from `.env` or host-managed plaintext
+
+1. Run `credentials set qwen` and/or `credentials set deepseek` from an interactive terminal.
+2. Confirm the intended entries with `credentials status`.
+3. Add `--provider qwen` or `--provider deepseek` to the host's server arguments.
+4. Remove the API key and generic Provider URL/model from the host entry, then restart the host.
+5. After successful Tool discovery and one synthetic-image call, securely remove old plaintext
+   copies from `.env`, shell scripts, clipboard managers, and configuration backups you control.
+
+Do not delete the old copy until the Keychain-backed startup has been verified. If rollback is
+needed, remove `--provider` and restore the previous environment-only configuration.
 
 ## Privacy and Provider data flow
 
@@ -178,13 +214,18 @@ hosts should avoid immediate unbounded retry loops.
 ## Troubleshooting
 
 - **Server is disconnected:** run the host's MCP list/get command. Confirm Node 22+, the scoped
-  package name, and that `SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL` are present.
+  package name, and either a valid `--provider` profile or both generic Provider variables.
+- **Profile credential is missing:** run `credentials status qwen|deepseek`, then run
+  `credentials set qwen|deepseek` from an interactive macOS terminal. On another operating system,
+  inject the selected profile's environment variable.
+- **Keychain lookup fails:** unlock the login Keychain and retry. Sight MCP fails closed and does
+  not switch Providers or credentials.
 - **Startup exits immediately:** allowed roots must be existing absolute directories; non-loopback
   HTTP endpoints are rejected and must use HTTPS.
 - **`PATH_NOT_ALLOWED`:** pass an absolute canonical path under a narrow allowed root. Symlinks do
   not bypass the boundary.
-- **`PROVIDER_AUTHENTICATION`:** export the key before launching the host. Never add it to a tracked
-  configuration file.
+- **`PROVIDER_AUTHENTICATION`:** replace the selected Keychain item or exported environment key.
+  Never add it to a tracked configuration file.
 - **`PROVIDER_TIMEOUT` or `PROVIDER_UNAVAILABLE`:** verify the model supports images and that the
   configured API root does not already end in `/chat/completions`.
 - **Protocol parse/startup errors:** stdout must remain untouched. Inspect the server's stderr via
@@ -214,6 +255,7 @@ Release remain separate human-approved steps.
 
 - [v0.1.0 proposal and full specification](docs/proposals/0001-sight-mcp-v0.1.0.md)
 - [Runtime and architecture ADR](docs/adr/0001-runtime-and-architecture.md)
+- [macOS Keychain and Provider profiles ADR](docs/adr/0002-macos-keychain-provider-profiles.md)
 - [Vision tool and Provider contract](docs/specs/vision-tool-contract.md)
 - [Configuration specification](docs/specs/configuration.md)
 - [Threat model](docs/security/threat-model.md)

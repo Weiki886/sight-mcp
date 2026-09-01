@@ -2,13 +2,19 @@
 
 import type { StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 
+import { parseCliArguments, CliUsageError } from "./cli-arguments.js";
 import { ConfigError, loadConfig } from "./config.js";
+import { CredentialStoreError } from "./credentials/credential-store.js";
+import { runCredentialsCommand } from "./credentials-command.js";
+import { createMacOSKeychainStore } from "./infrastructure/credentials/macos-keychain-store.js";
 import { createLogger, type Logger } from "./logger.js";
 import { startStdioServer } from "./server/run-stdio.js";
 
 function writeStartupError(error: unknown): void {
   const message =
-    error instanceof ConfigError
+    error instanceof ConfigError ||
+    error instanceof CredentialStoreError ||
+    error instanceof CliUsageError
       ? error.message
       : "Sight MCP failed to start because of an unexpected error.";
 
@@ -40,12 +46,26 @@ function registerShutdown(handle: StdioServerHandle, logger: Logger): void {
   });
 }
 
-try {
-  const config = await loadConfig();
+async function main(): Promise<void> {
+  const command = parseCliArguments(process.argv.slice(2));
+  const credentialStore = createMacOSKeychainStore();
+  if (command.kind === "credentials") {
+    process.exitCode = await runCredentialsCommand(command, credentialStore);
+    return;
+  }
+
+  const config = await loadConfig(process.env, {
+    credentialReader: credentialStore,
+    ...(command.provider === undefined ? {} : { providerProfile: command.provider }),
+  });
   const logger = createLogger(config.logLevel);
   const handle = startStdioServer(config, logger);
   registerShutdown(handle, logger);
+}
+
+try {
+  await main();
 } catch (error: unknown) {
   writeStartupError(error);
-  process.exitCode = 1;
+  process.exitCode = error instanceof CliUsageError ? 2 : 1;
 }

@@ -202,6 +202,119 @@ describe("loadConfig", () => {
     }
   });
 
+  it.each([
+    [
+      "qwen" as const,
+      "SIGHT_QWEN_API_KEY",
+      "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "qwen3.8-flash",
+    ],
+    [
+      "deepseek" as const,
+      "SIGHT_DEEPSEEK_API_KEY",
+      "https://api.deepseek.com",
+      "deepseek-v4-flash-vision-exp",
+    ],
+  ])(
+    "loads the fixed %s profile and its provider-specific environment credential",
+    async (profile, variableName, baseUrl, model) => {
+      const directory = await temporaryDirectory();
+      const profileKey = `${profile}-profile-private-key`;
+      const config = await loadConfig(
+        {
+          [variableName]: profileKey,
+          SIGHT_PROVIDER_BASE_URL: "https://ignored-provider.example/v1",
+          SIGHT_PROVIDER_MODEL: "ignored-model",
+        },
+        { cwd: directory, providerProfile: profile },
+      );
+
+      expect(config.provider).toMatchObject({ baseUrl, model, reasoningEffort: "low" });
+      expect(config.provider.apiKey).toBeDefined();
+      if (config.provider.apiKey !== undefined) {
+        expect(revealProviderApiKey(config.provider.apiKey)).toBe(profileKey);
+      }
+    },
+  );
+
+  it("resolves profile credentials in explicit generic, selected environment, Keychain order", async () => {
+    const directory = await temporaryDirectory();
+    const requestedAccounts: string[] = [];
+    const credentialReader = {
+      get: (provider: "qwen" | "deepseek") => {
+        requestedAccounts.push(provider);
+        return Promise.resolve("keychain-private-key");
+      },
+    };
+
+    const generic = await loadConfig(
+      {
+        SIGHT_PROVIDER_API_KEY: "generic-private-key",
+        SIGHT_QWEN_API_KEY: "qwen-environment-private-key",
+      },
+      { credentialReader, cwd: directory, providerProfile: "qwen" },
+    );
+    if (generic.provider.apiKey !== undefined) {
+      expect(revealProviderApiKey(generic.provider.apiKey)).toBe("generic-private-key");
+    }
+    expect(requestedAccounts).toEqual([]);
+
+    const selectedEnvironment = await loadConfig(
+      { SIGHT_QWEN_API_KEY: "qwen-environment-private-key" },
+      { credentialReader, cwd: directory, providerProfile: "qwen" },
+    );
+    if (selectedEnvironment.provider.apiKey !== undefined) {
+      expect(revealProviderApiKey(selectedEnvironment.provider.apiKey)).toBe(
+        "qwen-environment-private-key",
+      );
+    }
+    expect(requestedAccounts).toEqual([]);
+
+    const keychain = await loadConfig(
+      { SIGHT_DEEPSEEK_API_KEY: "unselected-private-key" },
+      { credentialReader, cwd: directory, providerProfile: "qwen" },
+    );
+    if (keychain.provider.apiKey !== undefined) {
+      expect(revealProviderApiKey(keychain.provider.apiKey)).toBe("keychain-private-key");
+    }
+    expect(requestedAccounts).toEqual(["qwen"]);
+  });
+
+  it("allows an explicit effort override for a built-in profile", async () => {
+    const directory = await temporaryDirectory();
+    await expect(
+      loadConfig(
+        { SIGHT_PROVIDER_API_KEY: "private-key", SIGHT_PROVIDER_REASONING_EFFORT: "medium" },
+        { cwd: directory, providerProfile: "qwen" },
+      ),
+    ).resolves.toMatchObject({ provider: { reasoningEffort: "medium" } });
+  });
+
+  it("fails with sanitized profile credential errors", async () => {
+    const directory = await temporaryDirectory();
+    await expect(loadConfig({}, { cwd: directory, providerProfile: "qwen" })).rejects.toThrow(
+      "qwen provider credential is not configured. Run sight-mcp credentials set qwen.",
+    );
+    await expect(
+      loadConfig(
+        { SIGHT_QWEN_API_KEY: "private invalid key with spaces" },
+        { cwd: directory, providerProfile: "qwen" },
+      ),
+    ).rejects.toThrow("SIGHT_QWEN_API_KEY is invalid.");
+    await expect(
+      loadConfig(
+        {},
+        {
+          credentialReader: {
+            get: () => Promise.reject(new Error("private-keychain-diagnostic")),
+          },
+          cwd: directory,
+          providerProfile: "deepseek",
+        },
+      ),
+    ).rejects.toThrow("macOS Keychain credential lookup failed.");
+  });
+
   it.each(["low", "medium", "high", "xhigh", "max"] as const)(
     "accepts provider reasoning effort %s",
     async (reasoningEffort) => {

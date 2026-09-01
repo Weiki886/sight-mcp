@@ -3,6 +3,8 @@
 - Status: Accepted
 - Accepted: 2026-08-28
 - Date: 2026-08-28
+- Amended: 2026-09-01; credential-source details are superseded by
+  [ADR 0002](0002-macos-keychain-provider-profiles.md)
 - Deciders: Weiki886
 - Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.md),
   [Issue #1](https://github.com/Weiki886/sight-mcp/issues/1)
@@ -77,8 +79,9 @@ or arbitrary header.
 ### Configuration
 
 Use validated environment variables plus documented safe defaults in v0.1.0. Do not load credentials
-implicitly from the repository or current directory. Invalid required configuration fails startup
-with redacted diagnostics.
+implicitly from the repository or current directory. An explicit built-in Provider profile may use
+the operating-system credential source defined by ADR 0002. Invalid required configuration fails
+startup with redacted diagnostics.
 
 ### Image processing
 
@@ -102,7 +105,8 @@ without enlargement, and encode a bounded provider payload.
 
 - Node and a package install are required; v0.1.0 is not a single native executable.
 - `sharp` introduces a native dependency and supply-chain/packaging work across supported platforms.
-- Environment-only configuration can be verbose in host configuration files.
+- Generic environment-only configuration can be verbose in host configuration files; ADR 0002 adds
+  an explicit macOS Keychain path for built-in profiles.
 - OpenAI-compatible implementations vary in response details; the adapter must reject unsupported
   shapes instead of accumulating silent heuristics.
 - stdio does not serve shared or remote clients.
