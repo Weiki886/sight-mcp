@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Accepted: 2026-08-28
+- Amended: 2026-09-01 by Issue #16
 - Scope: v0.1.0
 - Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.md),
   [threat model](../security/threat-model.md)
@@ -51,6 +52,24 @@ The normal test suite never calls a live provider and never requires a real cred
 - cwd-only root default and platform-delimited explicit roots;
 - nonexistent, relative, duplicate, nested, root-level, and home-level allowed roots;
 - secret redaction at every log level and error path.
+- fixed Qwen/DeepSeek endpoint, model, and default-effort mappings;
+- profile credential precedence: generic override, selected Provider environment variable, then
+  selected Keychain account;
+- an unselected Provider credential is never read and missing/failed Keychain lookup fails closed;
+- generic no-argument configuration remains backward compatible.
+
+### Credential CLI and macOS Keychain
+
+- the CLI parser accepts only the documented profile and credential command grammar and returns
+  usage status `2` for invalid input;
+- set invokes the absolute system command without a shell, puts prompt-only `-w` last, passes no
+  secret argument, and rejects a non-interactive terminal;
+- get/status/delete use the exact service and selected account; status never requests password
+  output;
+- missing item exit status, unavailable platform, command failure, timeout, and oversized output map
+  to sanitized bounded behavior;
+- delete prompts by default, cancellation does not mutate state, and `--yes` is explicit;
+- synthetic canary values do not appear in errors, logs, status output, or serialized config.
 
 ### Input authorization
 
@@ -114,6 +133,8 @@ client.
 - bounded parallel calls, queue full behavior, and clean shutdown;
 - stdout parses entirely as MCP traffic; all diagnostics are on stderr;
 - startup configuration failure exits non-zero before accepting protocol input;
+- `--provider qwen|deepseek` initializes and lists the Tool with the selected environment-key
+  fallback while an invalid profile exits before emitting protocol stdout;
 - a 2025-era compatibility handshake is included if the official v2 SDK test client supports it
   without legacy server code.
 
@@ -130,9 +151,16 @@ Record host version, Node version, operating system, package digest, provider ty
 real/remote real), result, and sanitized failure evidence. Do not publish keys, personal paths,
 images, or complete provider payloads.
 
-At least one release-candidate smoke run uses a local OpenAI-compatible endpoint. A remote-provider
-smoke run is optional and must use a non-sensitive synthetic fixture and a user-authorized
-credential.
+At least one release-candidate smoke run uses a local OpenAI-compatible endpoint. Before Issue #16
+is accepted for release, both documented profiles require a user-authorized remote smoke test with
+non-sensitive synthetic chart/OCR fixtures, and at least one Claude Code and one Codex entry must
+launch the packed artifact with `--provider`. Natural-language answers are reviewed for capability,
+not asserted byte-for-byte.
+
+On macOS, validate the actual Keychain boundary separately with a generated canary under an isolated
+test service name: write interactively, check existence without revealing it, read and compare it in
+memory, delete the exact item, and confirm it is absent. The cleanup result is part of the sanitized
+test record. Never overwrite or read a user's production `qwen` or `deepseek` item for this check.
 
 ## CI design
 

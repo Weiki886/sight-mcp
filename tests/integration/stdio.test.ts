@@ -78,9 +78,10 @@ async function connectCli(
   allowedRoot: string,
   providerBaseUrl: string,
   environment: Readonly<Record<string, string>> = {},
+  cliArguments: readonly string[] = [],
 ): Promise<ConnectedCli> {
   const transport = new StdioClientTransport({
-    args: [cliPath],
+    args: [cliPath, ...cliArguments],
     command: process.execPath,
     cwd: projectRoot,
     env: {
@@ -294,5 +295,55 @@ describe("stdio CLI", () => {
     expect(stdout).toBe("");
     expect(stderr).toContain("SIGHT_LOG_LEVEL is invalid.");
     expect(stderr).not.toContain("invalid-secret-value");
+  });
+
+  it("starts through a built-in profile without reading an unselected credential", async () => {
+    const fixture = await temporaryImage();
+    const selectedKey = "qwen-selected-private-key";
+    const unselectedKey = "deepseek-unselected-private-key";
+    const connected = await connectCli(
+      fixture.directory,
+      "http://127.0.0.1:11434/v1",
+      {
+        SIGHT_DEEPSEEK_API_KEY: unselectedKey,
+        SIGHT_QWEN_API_KEY: selectedKey,
+      },
+      ["--provider", "qwen"],
+    );
+
+    try {
+      await expect(connected.client.listTools()).resolves.toMatchObject({
+        tools: [{ name: "analyze_image" }],
+      });
+    } finally {
+      await connected.client.close();
+    }
+
+    expect(connected.stderr()).not.toContain(selectedKey);
+    expect(connected.stderr()).not.toContain(unselectedKey);
+  });
+
+  it("rejects unknown CLI arguments before MCP startup without echoing them", async () => {
+    const invalidCanary = "private-invalid-profile-canary";
+    const child = spawn(process.execPath, [cliPath, "--provider", invalidCanary], {
+      cwd: projectRoot,
+      env: { PATH: process.env["PATH"] },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+
+    const [exitCode] = (await once(child, "exit")) as [number | null, NodeJS.Signals | null];
+
+    expect(exitCode).toBe(2);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("Usage: sight-mcp");
+    expect(stderr).not.toContain(invalidCanary);
   });
 });

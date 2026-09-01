@@ -54,6 +54,9 @@ function hostArguments(host, configPath, config, prompt, schemaPath, resultPath)
   const environment = Object.entries(config.environment)
     .map(([key, value]) => `${key}=${tomlString(value)}`)
     .join(",");
+  const cliArguments = [config.cliPath, ...config.cliArguments]
+    .map((value) => tomlString(value))
+    .join(",");
   return [
     "exec",
     "--ephemeral",
@@ -70,7 +73,7 @@ function hostArguments(host, configPath, config, prompt, schemaPath, resultPath)
     "--config",
     `mcp_servers.sight_mcp.command=${tomlString(process.execPath)}`,
     "--config",
-    `mcp_servers.sight_mcp.args=[${tomlString(config.cliPath)}]`,
+    `mcp_servers.sight_mcp.args=[${cliArguments}]`,
     "--config",
     `mcp_servers.sight_mcp.env={${environment}}`,
     "--config",
@@ -97,6 +100,12 @@ function assertMainResult(result) {
     if (result[scenario] !== true) {
       throw new Error(`Host did not pass ${scenario}.`);
     }
+  }
+}
+
+function assertProfileResult(result) {
+  if (result.vision !== true) {
+    throw new Error("Host did not pass the live Provider profile vision scenario.");
   }
 }
 
@@ -188,13 +197,20 @@ async function runCancellation(command, args, cancellationStarted, cancellationC
 const host = argumentValue("--host");
 const archiveArgument = argumentValue("--archive");
 const recordArgument = argumentValue("--record");
+const profile = argumentValue("--profile");
 if (
   (host !== "claude-code" && host !== "codex") ||
   archiveArgument === undefined ||
-  recordArgument === undefined
+  recordArgument === undefined ||
+  (profile !== undefined && profile !== "qwen" && profile !== "deepseek")
 ) {
   throw new Error(
-    "Usage: node scripts/run-host-smoke.mjs --host <claude-code|codex> --archive <tgz> --record <json>",
+    "Usage: node scripts/run-host-smoke.mjs --host <claude-code|codex> --archive <tgz> --record <json> [--profile <qwen|deepseek>]",
+  );
+}
+if (profile !== undefined && process.env.SIGHT_PROVIDER_API_KEY === undefined) {
+  throw new Error(
+    "A live profile smoke requires SIGHT_PROVIDER_API_KEY in the runner environment.",
   );
 }
 
@@ -229,15 +245,21 @@ try {
   await mkdir(fixtureDirectory);
   const fixturePath = join(fixtureDirectory, "synthetic.png");
   const deniedPath = join(installDirectory, "denied.png");
+  const liveFixture = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="white"/><text x="40" y="55" font-family="Arial" font-size="30" fill="black">Sight MCP Canary 2048</text><text x="40" y="100" font-family="Arial" font-size="22" fill="black">Q1 12   Q2 28   Q3 19</text><rect x="80" y="210" width="90" height="96" fill="#3b82f6"/><rect x="250" y="82" width="90" height="224" fill="#10b981"/><rect x="420" y="154" width="90" height="152" fill="#f59e0b"/></svg>',
+  );
   await Promise.all([
-    sharp({
-      create: {
-        background: { alpha: 1, b: 255, g: 255, r: 255 },
-        channels: 4,
-        height: 48,
-        width: 64,
-      },
-    })
+    (profile === undefined
+      ? sharp({
+          create: {
+            background: { alpha: 1, b: 255, g: 255, r: 255 },
+            channels: 4,
+            height: 48,
+            width: 64,
+          },
+        })
+      : sharp(liveFixture)
+    )
       .png()
       .toFile(fixturePath),
     sharp({
@@ -274,11 +296,15 @@ try {
       response.end(JSON.stringify({ choices: [{ message: { content: answer } }] }));
     });
   });
-  provider.listen(0, "127.0.0.1");
-  await once(provider, "listening");
-  const address = provider.address();
-  if (address === null || typeof address === "string") {
-    throw new Error("Synthetic Host-smoke Provider did not expose a TCP port.");
+  let providerBaseUrl;
+  if (profile === undefined) {
+    provider.listen(0, "127.0.0.1");
+    await once(provider, "listening");
+    const address = provider.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("Synthetic Host-smoke Provider did not expose a TCP port.");
+    }
+    providerBaseUrl = `http://127.0.0.1:${String(address.port)}/v1`;
   }
 
   const cliPath = join(
@@ -289,26 +315,50 @@ try {
     "dist",
     "cli.js",
   );
-  const environment = {
-    SIGHT_ALLOWED_ROOTS: fixtureDirectory,
-    SIGHT_LOG_LEVEL: "silent",
-    SIGHT_MAX_RETRIES: "0",
-    SIGHT_PROVIDER_BASE_URL: `http://127.0.0.1:${String(address.port)}/v1`,
-    SIGHT_PROVIDER_MODEL: "synthetic-host-smoke",
-    SIGHT_REQUEST_TIMEOUT_MS: "15000",
+  const environment =
+    profile === undefined
+      ? {
+          SIGHT_ALLOWED_ROOTS: fixtureDirectory,
+          SIGHT_LOG_LEVEL: "silent",
+          SIGHT_MAX_RETRIES: "0",
+          SIGHT_PROVIDER_BASE_URL: providerBaseUrl,
+          SIGHT_PROVIDER_MODEL: "synthetic-host-smoke",
+          SIGHT_REQUEST_TIMEOUT_MS: "15000",
+        }
+      : {
+          SIGHT_ALLOWED_ROOTS: fixtureDirectory,
+          SIGHT_LOG_LEVEL: "silent",
+          SIGHT_MAX_RETRIES: "0",
+          SIGHT_PROVIDER_MAX_TOKENS: "4096",
+          SIGHT_REQUEST_TIMEOUT_MS: "120000",
+        };
+  const outputSchema =
+    profile === undefined
+      ? {
+          additionalProperties: false,
+          properties: {
+            chart: { const: true, type: "boolean" },
+            deniedPath: { const: true, type: "boolean" },
+            ocrStyle: { const: true, type: "boolean" },
+            providerFailure: { const: true, type: "boolean" },
+          },
+          required: ["chart", "ocrStyle", "deniedPath", "providerFailure"],
+          type: "object",
+        }
+      : {
+          additionalProperties: false,
+          properties: { vision: { const: true, type: "boolean" } },
+          required: ["vision"],
+          type: "object",
+        };
+  const cliArguments = profile === undefined ? [cliPath] : [cliPath, "--provider", profile];
+  const config = {
+    cliArguments: cliArguments.slice(1),
+    cliPath,
+    environment,
+    outputSchema,
+    workingDirectory: installDirectory,
   };
-  const outputSchema = {
-    additionalProperties: false,
-    properties: {
-      chart: { const: true, type: "boolean" },
-      deniedPath: { const: true, type: "boolean" },
-      ocrStyle: { const: true, type: "boolean" },
-      providerFailure: { const: true, type: "boolean" },
-    },
-    required: ["chart", "ocrStyle", "deniedPath", "providerFailure"],
-    type: "object",
-  };
-  const config = { cliPath, environment, outputSchema, workingDirectory: installDirectory };
   const configPath = join(temporaryDirectory, "claude-mcp.json");
   const schemaPath = join(temporaryDirectory, "host-output.schema.json");
   const resultPath = join(temporaryDirectory, "host-result.json");
@@ -319,7 +369,7 @@ try {
         {
           mcpServers: {
             "sight-mcp": {
-              args: [cliPath],
+              args: cliArguments,
               command: process.execPath,
               env: environment,
               type: "stdio",
@@ -333,25 +383,34 @@ try {
     writeFile(schemaPath, `${JSON.stringify(outputSchema, null, 2)}\n`),
   ]);
 
-  const mainPrompt = `Use only the configured Sight MCP analyze_image tool. Make exactly four calls. Call 1: path ${fixturePath}, prompt host-chart, and pass only if the answer says June and 31. Call 2: path ${fixturePath}, prompt host-ocr-style, and pass only if the answer says INVOICE 1042. Call 3: path ${deniedPath}, prompt host-denied-path, and pass only for PATH_NOT_ALLOWED. Call 4: path ${fixturePath}, prompt host-provider-failure, and pass only for PROVIDER_UNAVAILABLE. Return only the required boolean result object.`;
+  const mainPrompt =
+    profile === undefined
+      ? `Use only the configured Sight MCP analyze_image tool. Make exactly four calls. Call 1: path ${fixturePath}, prompt host-chart, and pass only if the answer says June and 31. Call 2: path ${fixturePath}, prompt host-ocr-style, and pass only if the answer says INVOICE 1042. Call 3: path ${deniedPath}, prompt host-denied-path, and pass only for PATH_NOT_ALLOWED. Call 4: path ${fixturePath}, prompt host-provider-failure, and pass only for PROVIDER_UNAVAILABLE. Return only the required boolean result object.`
+      : `Use only the configured Sight MCP analyze_image tool. Call it exactly once with path ${fixturePath}. Ask it to read the title and Q1/Q2/Q3 values and identify the tallest bar. Return {"vision":true} only if its answer contains Sight MCP Canary 2048, Q1 12, Q2 28, Q3 19, and says Q2 is tallest; otherwise return {"vision":false}.`;
   const mainArgs = hostArguments(host, configPath, config, mainPrompt, schemaPath, resultPath);
   const mainStdout = await runHostMain(hostCommand, mainArgs, installDirectory);
   const mainResult =
     host === "claude-code"
       ? extractClaudeResult(mainStdout)
       : JSON.parse(await readFile(resultPath, "utf8"));
-  assertMainResult(mainResult);
+  if (profile === undefined) {
+    assertMainResult(mainResult);
+  } else {
+    assertProfileResult(mainResult);
+  }
 
-  const cancellationPrompt = `Use only the configured Sight MCP analyze_image tool. Call it once with path ${fixturePath} and prompt host-cancellation, then wait for the result.`;
-  const cancellationArgs = hostArguments(
-    host,
-    configPath,
-    config,
-    cancellationPrompt,
-    schemaPath,
-    resultPath,
-  );
-  await runCancellation(hostCommand, cancellationArgs, cancellationStarted, cancellationClosed);
+  if (profile === undefined) {
+    const cancellationPrompt = `Use only the configured Sight MCP analyze_image tool. Call it once with path ${fixturePath} and prompt host-cancellation, then wait for the result.`;
+    const cancellationArgs = hostArguments(
+      host,
+      configPath,
+      config,
+      cancellationPrompt,
+      schemaPath,
+      resultPath,
+    );
+    await runCancellation(hostCommand, cancellationArgs, cancellationStarted, cancellationClosed);
+  }
 
   const digest = createHash("sha256")
     .update(await readFile(archivePath))
@@ -369,24 +428,32 @@ try {
           hostVersion: hostVersion.trim(),
           node: process.version,
           operatingSystem: operatingSystem.trim(),
-          provider: "local synthetic OpenAI-compatible endpoint",
+          provider:
+            profile === undefined
+              ? "local synthetic OpenAI-compatible endpoint"
+              : `remote ${profile} built-in profile`,
         },
         generatedAt: new Date().toISOString(),
-        scenarios: {
-          cancellation: "passed",
-          chart: "passed",
-          deniedPath: "passed",
-          discovery: "passed",
-          ocrStyle: "passed",
-          providerFailure: "passed",
-        },
+        scenarios:
+          profile === undefined
+            ? {
+                cancellation: "passed",
+                chart: "passed",
+                deniedPath: "passed",
+                discovery: "passed",
+                ocrStyle: "passed",
+                providerFailure: "passed",
+              }
+            : { discovery: "passed", vision: "passed" },
         schemaVersion: "1",
       },
       null,
       2,
     )}\n`,
   );
-  process.stdout.write(`${host} Host smoke passed for sha256:${digest}.\n`);
+  process.stdout.write(
+    `${host}${profile === undefined ? "" : ` ${profile} profile`} Host smoke passed for sha256:${digest}.\n`,
+  );
 } finally {
   provider.closeAllConnections();
   if (provider.listening) {

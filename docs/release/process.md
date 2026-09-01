@@ -4,7 +4,8 @@
 - Owner: repository maintainer
 - Related: [Issue #6](https://github.com/Weiki886/sight-mcp/issues/6),
   [v0.1.0 release notes](v0.1.0.md), [Host smoke procedure](host-smoke.md),
-  [accepted local smoke record](smoke-record-v0.1.0-rc.md)
+  [accepted local smoke record](smoke-record-v0.1.0-rc.md),
+  [profile smoke record](profile-smoke-record-2026-09-01.md)
 
 This runbook separates reproducible preparation from the irreversible npm publish, Git tag, and
 GitHub Release steps. No release operator may rebuild the tarball after it has passed Host smoke.
@@ -40,7 +41,9 @@ Before publication, the maintainer must verify all of the following against one 
 3. Local SHA-256 equals `artifact.sha256`.
 4. `gh attestation verify weiki886-sight-mcp-0.1.0.tgz --repo Weiki886/sight-mcp` succeeds.
 5. The CycloneDX SBOM identifies `@weiki886/sight-mcp@0.1.0` and its installed production tree.
-6. Claude Code and Codex Host records pass for that digest.
+6. Claude Code and Codex Host records pass for that digest. For a candidate containing Issue #16,
+   the live Qwen/DeepSeek profile records must also pass for that digest without placing credentials
+   in Host config or command arguments.
 7. `pnpm audit --prod --audit-level high`, the production-license gate, package allowlist, workflow
    security gate, and repository secret scan are reviewed.
 8. npm identity and scoped-package ownership are proven while authenticated:
