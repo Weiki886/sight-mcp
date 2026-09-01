@@ -1,5 +1,9 @@
 export type ImageErrorCode =
   | "CANCELLED"
+  | "CLIPBOARD_ACCESS_DENIED"
+  | "CLIPBOARD_NO_IMAGE"
+  | "CLIPBOARD_READ_FAILED"
+  | "CLIPBOARD_UNAVAILABLE"
   | "FILE_NOT_FOUND"
   | "FILE_NOT_REGULAR"
   | "FILE_TOO_LARGE"
@@ -40,6 +44,10 @@ export interface InputGuard {
   ) => Promise<ImageResult<AuthorizedImage>>;
 }
 
+export interface ClipboardImageReader {
+  readonly read: (signal: AbortSignal) => Promise<ImageResult<AuthorizedImage>>;
+}
+
 export interface ImagePipeline {
   readonly prepare: (
     image: AuthorizedImage,
@@ -49,6 +57,10 @@ export interface ImagePipeline {
 
 const errorMessages: Readonly<Record<ImageErrorCode, string>> = Object.freeze({
   CANCELLED: "The image operation was cancelled.",
+  CLIPBOARD_ACCESS_DENIED: "Clipboard image access was denied or cancelled by the user.",
+  CLIPBOARD_NO_IMAGE: "The clipboard does not contain an image.",
+  CLIPBOARD_READ_FAILED: "The clipboard image could not be read.",
+  CLIPBOARD_UNAVAILABLE: "Clipboard image reading is unavailable on this platform.",
   FILE_NOT_FOUND: "The image file does not exist.",
   FILE_NOT_REGULAR: "The image path is not a regular file.",
   FILE_TOO_LARGE: "The image file exceeds the configured byte limit.",

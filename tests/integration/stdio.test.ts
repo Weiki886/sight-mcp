@@ -130,7 +130,10 @@ describe("stdio CLI", () => {
 
     try {
       const listing = await connected.client.listTools();
-      expect(listing.tools.map((tool) => tool.name)).toEqual(["analyze_image"]);
+      expect(listing.tools.map((tool) => tool.name)).toEqual([
+        "analyze_image",
+        "analyze_clipboard_image",
+      ]);
 
       const success = await connected.client.callTool({
         arguments: { path: fixture.path, prompt: promptCanary },
@@ -313,7 +316,7 @@ describe("stdio CLI", () => {
 
     try {
       await expect(connected.client.listTools()).resolves.toMatchObject({
-        tools: [{ name: "analyze_image" }],
+        tools: [{ name: "analyze_image" }, { name: "analyze_clipboard_image" }],
       });
     } finally {
       await connected.client.close();

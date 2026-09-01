@@ -65,6 +65,10 @@ const failureSchema = z
       .object({
         code: z.enum([
           "INVALID_INPUT",
+          "CLIPBOARD_ACCESS_DENIED",
+          "CLIPBOARD_NO_IMAGE",
+          "CLIPBOARD_READ_FAILED",
+          "CLIPBOARD_UNAVAILABLE",
           "PATH_NOT_ABSOLUTE",
           "PATH_NOT_ALLOWED",
           "FILE_NOT_FOUND",

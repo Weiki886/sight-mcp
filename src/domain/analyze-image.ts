@@ -50,6 +50,15 @@ export interface AnalyzeImageService {
   readonly analyze: (request: AnalyzeImageRequest) => Promise<AnalyzeImageResult>;
 }
 
+export interface AnalyzeClipboardImageRequest {
+  readonly prompt: string;
+  readonly signal: AbortSignal;
+}
+
+export interface AnalyzeClipboardImageService {
+  readonly analyze: (request: AnalyzeClipboardImageRequest) => Promise<AnalyzeImageResult>;
+}
+
 const applicationErrors: Readonly<
   Record<"INVALID_INPUT" | "QUEUE_FULL", Readonly<{ message: string; retryable: boolean }>>
 > = Object.freeze({

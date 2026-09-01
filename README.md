@@ -1,8 +1,9 @@
 # Sight MCP
 
 Sight MCP is a secure Model Context Protocol vision bridge for text-only models in Claude Code,
-Codex, and other stdio MCP hosts. It exposes one read-only `analyze_image` tool for an authorized
-local PNG, JPEG, or WebP image.
+Codex, and other stdio MCP hosts. It exposes two read-only image tools: `analyze_image` for an
+authorized local PNG, JPEG, or WebP file, and `analyze_clipboard_image` for a one-click-confirmed
+image already on the macOS system clipboard.
 
 The server validates the path, removes metadata, bounds and normalizes the image in memory, then
 sends the pixels and question to one operator-configured OpenAI-compatible vision endpoint. It never
@@ -95,10 +96,15 @@ project configuration behavior.
 
 ```text
 analyze_image(path, prompt)
+analyze_clipboard_image(prompt)   (macOS only)
 ```
 
 - `path` must be an absolute path inside one of `SIGHT_ALLOWED_ROOTS` after canonical resolution.
 - `prompt` is a non-empty question of at most 8,000 characters.
+- `analyze_clipboard_image` reads the image currently on the system clipboard after a native
+  one-click confirmation dialog. It takes no path, so `SIGHT_ALLOWED_ROOTS` does not apply, and the
+  host cannot change the source. On a non-macOS system it returns `CLIPBOARD_UNAVAILABLE` without
+  invoking a helper.
 - A success returns readable text plus structured media/provider metadata.
 - A failure sets MCP `isError: true` and returns a stable code without the path, prompt, key,
   endpoint, image bytes, raw Provider body, or stack.
@@ -193,6 +199,11 @@ Provider request. Visible image content can still contain sensitive information.
 Providers, retention, training, access, jurisdiction, cost, and deletion policies are the operator's
 responsibility.
 
+`analyze_clipboard_image` stages the clipboard image in a user-private temporary file
+(`~/Library/Caches/Sight MCP/inbox`, mode `0700`) only long enough to read it, then deletes it in
+every exit path. The clipboard itself is never modified, and the temporary path and bytes are never
+logged or returned.
+
 Sight MCP never follows redirects or silently switches endpoints. It retries only connection
 failures and HTTP 408, 429, 502, 503, or 504, within the overall deadline and configured retry cap.
 Host cancellation propagates to queued work and the Provider request. Operational logs are redacted
@@ -203,6 +214,7 @@ structured JSON on stderr; stdout is reserved exclusively for MCP protocol traff
 | Category           | Codes                                                                                                                                           |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | input/path/file    | `INVALID_INPUT`, `PATH_NOT_ABSOLUTE`, `PATH_NOT_ALLOWED`, `FILE_NOT_FOUND`, `FILE_NOT_REGULAR`, `FILE_TOO_LARGE`                                |
+| clipboard          | `CLIPBOARD_ACCESS_DENIED`, `CLIPBOARD_NO_IMAGE`, `CLIPBOARD_READ_FAILED`, `CLIPBOARD_UNAVAILABLE`                                               |
 | image              | `UNSUPPORTED_MEDIA`, `IMAGE_TOO_LARGE`, `IMAGE_DECODE_FAILED`                                                                                   |
 | capacity/lifecycle | `QUEUE_FULL`, `CANCELLED`, `INTERNAL_ERROR`                                                                                                     |
 | Provider/output    | `PROVIDER_AUTHENTICATION`, `PROVIDER_RATE_LIMITED`, `PROVIDER_TIMEOUT`, `PROVIDER_UNAVAILABLE`, `PROVIDER_RESPONSE_INVALID`, `OUTPUT_TOO_LARGE` |
@@ -224,6 +236,14 @@ hosts should avoid immediate unbounded retry loops.
   HTTP endpoints are rejected and must use HTTPS.
 - **`PATH_NOT_ALLOWED`:** pass an absolute canonical path under a narrow allowed root. Symlinks do
   not bypass the boundary.
+- **`CLIPBOARD_ACCESS_DENIED`:** the confirmation dialog was cancelled or denied. Retry the tool and
+  choose Allow when it appears.
+- **`CLIPBOARD_NO_IMAGE`:** copy a PNG, JPEG, or WebP image to the clipboard first, then retry.
+- **`CLIPBOARD_UNAVAILABLE`:** clipboard reading is macOS-only in v0.1.0. Use `analyze_image` with a
+  saved file on other platforms.
+- **Clipboard confirmation does not appear or `CLIPBOARD_READ_FAILED`:** confirm accessibility
+  permissions (System Settings → Privacy & Security → Automation) let the host control the system
+  dialog, then retry.
 - **`PROVIDER_AUTHENTICATION`:** replace the selected Keychain item or exported environment key.
   Never add it to a tracked configuration file.
 - **`PROVIDER_TIMEOUT` or `PROVIDER_UNAVAILABLE`:** verify the model supports images and that the
@@ -256,6 +276,7 @@ Release remain separate human-approved steps.
 - [v0.1.0 proposal and full specification](docs/proposals/0001-sight-mcp-v0.1.0.md)
 - [Runtime and architecture ADR](docs/adr/0001-runtime-and-architecture.md)
 - [macOS Keychain and Provider profiles ADR](docs/adr/0002-macos-keychain-provider-profiles.md)
+- [One-click clipboard image reading ADR](docs/adr/0003-clipboard-image-reading.md)
 - [Vision tool and Provider contract](docs/specs/vision-tool-contract.md)
 - [Configuration specification](docs/specs/configuration.md)
 - [Threat model](docs/security/threat-model.md)

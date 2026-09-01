@@ -1,8 +1,12 @@
 import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 
-import { createAnalyzeImageService } from "../application/analyze-image.js";
+import {
+  createAnalyzeClipboardImageService,
+  createAnalyzeImageService,
+} from "../application/analyze-image.js";
 import { createBoundedWorkQueue } from "../application/bounded-work-queue.js";
 import type { AppConfig } from "../config.js";
+import { createMacOSClipboardImageReader } from "../infrastructure/clipboard/macos-clipboard-image-reader.js";
 import { createNodeInputGuard } from "../infrastructure/filesystem/node-input-guard.js";
 import { createSharpImagePipeline } from "../infrastructure/image/sharp-image-pipeline.js";
 import { createOpenAICompatibleProvider } from "../infrastructure/provider/openai-compatible-provider.js";
@@ -32,8 +36,15 @@ export function startStdioServer(config: AppConfig, logger: Logger): StdioServer
     { inputGuard, logger, pipeline, provider, queue },
     config.provider,
   );
+  const clipboardReader = createMacOSClipboardImageReader({
+    maxImageBytes: config.image.maxImageBytes,
+  });
+  const analyzeClipboardImage = createAnalyzeClipboardImageService(
+    { clipboardReader, logger, pipeline, provider, queue },
+    config.provider,
+  );
 
-  return serveStdio(() => createServer(analyzeImage), {
+  return serveStdio(() => createServer({ analyzeClipboardImage, analyzeImage }), {
     onerror: (error) => {
       logger.error("MCP transport error", { errorName: error.name });
     },

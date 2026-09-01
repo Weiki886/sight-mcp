@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Accepted: 2026-08-28
-- Amended: 2026-09-01 by Issue #16
+- Amended: 2026-09-01 by Issue #16 (Keychain profiles) and clipboard image input
 - Scope: v0.1.0
 - Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.md),
   [threat model](../security/threat-model.md)
@@ -79,6 +79,17 @@ The normal test suite never calls a live provider and never requires a real cred
 - missing path, directory, and available special-file types;
 - exact source-byte limit, one byte over, and file growth during read;
 - cancellation before open, during read, and after read.
+
+### Clipboard reading
+
+- non-macOS returns `CLIPBOARD_UNAVAILABLE` without spawning a helper;
+- confirmation precedes every read and rejection maps to `CLIPBOARD_ACCESS_DENIED`;
+- empty or non-image clipboard maps to `CLIPBOARD_NO_IMAGE`;
+- command failure, non-zero exit, and unexpected status map to `CLIPBOARD_READ_FAILED`;
+- cancellation before and during read maps to `CANCELLED`;
+- temporary file uses a user-private `0700` directory and a random name, and is deleted on success,
+  failure, limit rejection, and abort;
+- oversize staged image maps to `FILE_TOO_LARGE`.
 
 ### Image pipeline
 
