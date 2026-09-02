@@ -1,127 +1,105 @@
-# ADR 0003: One-click clipboard image reading
+# ADR 0003：一键剪切板图片读取
 
-- Status: Accepted
-- Accepted: 2026-09-01
-- Date: 2026-09-01
-- Deciders: Weiki886
-- Related: [ADR 0001](0001-runtime-and-architecture.md),
-  [tool contract](../specs/vision-tool-contract.md), [threat model](../security/threat-model.md)
+**语言 / Language：** 中文 · [English](0003-clipboard-image-reading.en.md)
 
-## Context
+- 状态：已接受
+- 接受日期：2026-09-01
+- 日期：2026-09-01
+- 决策者：Weiki886
+- 相关：[ADR 0001](0001-runtime-and-architecture.md)、
+  [工具契约](../specs/vision-tool-contract.md)、[威胁模型](../security/threat-model.md)
 
-ADR 0001 restricted image input to an absolute path inside operator-configured allowed roots. That
-boundary is predictable and auditable, but it forces the user to save every image into an allowed
-directory before a text-only host can ask about it. Screenshots and pasted images usually start on
-the system clipboard, so the practical workflow is "copy/screenshot, then file-dialog/save, then
-call the tool" — three manual steps even though the bytes are already in memory.
+## 背景
 
-The requirement is not to give the host a general file reader, and it must not become a silent
-clipboard exfiltration channel. A clipboard image is still sensitive visible content that a remote
-Provider may receive, so reading it needs the same explicit, locally visible consent that the
-allowed-root selection provides for files.
+ADR
+0001 把图像输入限制为「位于运营方配置的允许根目录之内的绝对路径」。这条边界可预期、可审计，但它迫使用户在纯文本宿主提问之前，先把每张图片存进某个允许目录。而截图和粘贴的图片通常一开始只存在于系统剪切板里，于是实际工作流变成了「复制/截图 → 打开文件对话框保存 → 调用工具」——明明字节已经在内存里了，却要三个手动步骤。
 
-## Decision
+这里的需求并不是给宿主一个通用文件读取器，同时它也绝不能变成一条静默的剪切板外泄通道。剪切板图片依然是敏感的可见内容，且可能被发送给远程 Provider，因此读取它需要与「允许根目录选择」为文件提供的那种同等显式、且在本地可见的用户同意。
 
-Add a second, read-only tool `analyze_clipboard_image(prompt)`. It accepts only the analysis
-`prompt`; the image source is the macOS system clipboard. The tool cannot take a path, URL, base64
-string, MIME type, or any way to change the source.
+## 决策
 
-### User consent and platform scope
+新增第二个只读工具 `analyze_clipboard_image(prompt)`。它只接受分析用的
+`prompt`；图像来源固定为 macOS 系统剪切板。该工具无法接受路径、URL、base64 字符串、MIME 类型，或任何可以改变来源的方式。
 
-The first implementation is macOS-only. Before reading, the server runs the absolute
-`/usr/bin/osascript` (no shell) to show a native `display dialog` that describes where the image may
-be sent and asks the user to allow or cancel. Canceling returns `CLIPBOARD_ACCESS_DENIED`. There is
-no silent or cached consent; every call requires the dialog.
+### 用户同意与平台范围
 
-Other platforms return `CLIPBOARD_UNAVAILABLE` without invoking a helper. A future port must add its
-own consent mechanism under a new ADR rather than silently reusing this design.
+首个实现仅限 macOS。读取前，服务会执行绝对路径的 `/usr/bin/osascript`（不经过 shell），弹出一个原生
+`display dialog`，说明图片可能被发送到哪里，并请用户选择允许或取消。取消返回
+`CLIPBOARD_ACCESS_DENIED`。不存在静默同意或缓存同意；每次调用都需要弹框。
 
-### Temporary storage
+其它平台直接返回
+`CLIPBOARD_UNAVAILABLE`，不会启动任何辅助程序。未来移植到其它平台时，必须在新的 ADR 下补充其自身的同意机制，而不是默默沿用本设计。
 
-The clipboard is read as a PNG and written to a temporary file inside a user-private directory:
+### 临时存储
+
+剪切板内容以 PNG 读取，并写入用户私有目录下的临时文件：
 
 ```text
 ~/Library/Caches/Sight MCP/inbox
 ```
 
-The directory is created with mode `0700` and the file uses a random UUID name. The file is read
-immediately, bounded in bytes, and deleted in a `finally` block whether the read succeeds, fails, or
-is cancelled. The source clipboard stays untouched. No clipboard bytes are written to logs, errors,
-or the MCP stdout channel.
+该目录以 `0700` 权限创建，文件名使用随机 UUID。文件会被立即读取、限制字节数，并在 `finally`
+块中删除——无论读取成功、失败还是被取消。源剪切板内容始终不被修改。任何剪切板字节都不会写入日志、错误信息或 MCP 的 stdout 通道。
 
-### Shared analysis pipeline
+### 共享分析流水线
 
-Clipboard analysis reuses the existing bounded queue, `ImagePipeline`, and `VisionProvider`, and it
-returns the same versioned `AnalyzeImageResult` and output schema as `analyze_image`. It therefore
-inherits decode, dimension, pixel, output, timeout, queue, retry, and cost limits. The clipboard
-path does not go through the filesystem `InputGuard`, because there is no stable filesystem path to
-authorize; instead, the native consent dialog is the access boundary.
+剪切板分析复用既有的有界队列、`ImagePipeline` 与 `VisionProvider`，并返回与 `analyze_image`
+相同的带版本 `AnalyzeImageResult`
+及输出 schema。因此它同样继承了解码、尺寸、像素、输出、超时、队列、重试与费用等各项限制。剪切板路径不经过文件系统的
+`InputGuard`，因为这里不存在可供授权的稳定文件路径；取而代之，原生同意对话框就是那条访问边界。
 
-### Stable error codes
+### 稳定错误码
 
 ```text
-CLIPBOARD_ACCESS_DENIED  the user denied or cancelled the confirmation
-CLIPBOARD_NO_IMAGE       the clipboard does not contain an image
-CLIPBOARD_READ_FAILED    the clipboard image could not be written or read
-CLIPBOARD_UNAVAILABLE    clipboard reading is unsupported on this platform
+CLIPBOARD_ACCESS_DENIED  用户拒绝或取消了确认
+CLIPBOARD_NO_IMAGE       剪切板中没有图片
+CLIPBOARD_READ_FAILED    剪切板图片无法写入或读取
+CLIPBOARD_UNAVAILABLE    当前平台不支持剪切板读取
 ```
 
-Oversize clipboard images reuse `FILE_TOO_LARGE`; cancellation reuses `CANCELLED`.
+超出大小限制的剪切板图片复用 `FILE_TOO_LARGE`；取消复用 `CANCELLED`。
 
-## Consequences
+## 影响
 
-### Positive
+### 正面
 
-- The copy/screenshot → save → call loop collapses to copy → call.
-- Consent is explicit per call and visible in the user's own interface.
-- The clipboard source is read without a persistent project cache and without an unbounded or
-  world-readable temporary file.
-- Existing tool, output, provider, configuration, and credential behavior are unchanged.
+- 「复制/截图 → 保存 → 调用」的循环收缩为「复制 → 调用」。
+- 同意是逐次调用显式给出的，并且在用户自己的界面中可见。
+- 读取剪切板来源时，不依赖持久化的项目缓存，也不产生无界或全局可读的临时文件。
+- 既有的工具、输出、Provider、配置与凭据行为均保持不变。
 
-### Negative
+### 负面
 
-- macOS-only in v0.1.0, matching the existing Keychain backend; other platforms are not served.
-- `osascript` runs under the local user and depends on macOS Automation permissions in some
-  configurations, which may present additional system prompts.
-- Although the temporary file is private and immediately deleted, clipboard input introduces an
-  on-disk step that pure file input avoids; managed-memory copies still cannot be zeroized
-  immediately.
-- The host model may now trigger a clipboard read, which can surface more than the user expected if
-  the clipboard holds a sensitive image; the single confirmation dialog is the mitigation, not a
-  technical guarantee.
+- v0.1.0 中仅限 macOS，与既有的 Keychain 后端一致；其它平台暂不支持。
+- `osascript` 以本地用户身份运行，在某些配置下依赖 macOS 的「自动化」权限，可能触发额外的系统提示。
+- 尽管临时文件是私有且立即删除的，剪切板输入仍引入了一个纯文件输入所没有的落盘步骤；受托管内存中的副本也无法被立即清零。
+- 宿主模型现在可以触发剪切板读取，如果剪切板里恰好是敏感图片，可能暴露超出用户预期的内容；单次确认对话框是缓解手段，而非技术保证。
 
-### Risks
+### 风险
 
-- A same-user process could prompt or read the clipboard through the same mechanism; the threat
-  model already assumes a same-user attacker is not fully containable.
-- AppleScript/`osascript` behavior can change across macOS versions; the implementation uses a
-  stable four-char-code token and treats all non-`OK` statuses as failures.
+- 同一用户下的其它进程可以通过相同机制弹框或读取剪切板；威胁模型本就假设同用户攻击者无法被完全遏制。
+- AppleScript/`osascript` 的行为可能随 macOS 版本变化；实现使用稳定的四字符码 token，并把所有非 `OK`
+  状态一律视为失败。
 
-## Rejected alternatives
+## 已否决的备选方案
 
-- Accepting a pasted path into `analyze_image`: keeps the filesystem allowlist but does not remove
-  the manual save step, and clipboard managers/paste events are awkward in stdio MCP.
-- Automatically copying any pasted/clipboard item into an allowed project folder: expands on-disk
-  state, risks tracked-artifact leakage, and still needs a reliable source for the bytes.
-- Reading the clipboard silently inside `analyze_image`: no explicit consent, and a text-only host
-  could trigger image exfiltration without the user noticing.
-- A persistent clipboard cache directory: accumulates sensitive images and defeats the "read once,
-  delete immediately" boundary.
-- Supporting Windows/Linux clipboard now: adds per-platform dependencies and permission models
-  before the macOS consent loop is validated.
+- 在 `analyze_image`
+  中接受粘贴进来的路径：保留了文件系统白名单，但没有消除手动保存步骤，而且剪切板管理器/粘贴事件在 stdio
+  MCP 下很别扭。
+- 自动把任意粘贴/剪切板内容复制进某个允许的项目目录：扩大了落盘状态，有被纳入版本管理而泄露的风险，而且仍需要一个可靠的字节来源。
+- 在 `analyze_image`
+  内部静默读取剪切板：没有显式同意，纯文本宿主可能在用户毫无察觉的情况下触发图像外泄。
+- 使用持久化的剪切板缓存目录：会不断积累敏感图片，并破坏「读取一次、立即删除」的边界。
+- 现在就支持 Windows/Linux 剪切板：在 macOS 同意流程尚未验证之前，就先引入各平台的依赖与权限模型。
 
-## Compliance
+## 合规检查
 
-Implementation conforms to this ADR when:
+实现满足以下条件时即符合本 ADR：
 
-- `analyze_clipboard_image` accepts only a `prompt` and shares the `analyze_image` output schema and
-  error mapping;
-- the subprocess uses `shell: false` and a bounded deadline, and never receives image bytes in
-  arguments;
-- a user-visible confirmation is required before every read and its rejection maps to
-  `CLIPBOARD_ACCESS_DENIED`;
-- temporary bytes stay in a `0700` user-private directory with a random name and are deleted in all
-  exit paths;
-- clipboard bytes, prompts, and temporary paths do not reach logs, errors, or stdout;
-- cancellation and the image byte limit are bounded and tested;
-- non-macOS returns `CLIPBOARD_UNAVAILABLE` without spawning a helper.
+- `analyze_clipboard_image` 只接受 `prompt`，并共享 `analyze_image` 的输出 schema 与错误映射；
+- 子进程使用 `shell: false` 与有界截止时间，且参数中绝不出现图像字节；
+- 每次读取前都要求用户可见的确认，拒绝时映射为 `CLIPBOARD_ACCESS_DENIED`；
+- 临时字节存放在 `0700` 用户私有目录、使用随机文件名，并在所有退出路径中删除；
+- 剪切板字节、prompt 与临时路径都不会进入日志、错误信息或 stdout；
+- 取消行为与图像字节上限都是有界的并有测试覆盖；
+- 非 macOS 平台返回 `CLIPBOARD_UNAVAILABLE`，且不启动任何辅助程序。

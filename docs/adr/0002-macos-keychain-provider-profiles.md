@@ -1,58 +1,54 @@
-# ADR 0002: macOS Keychain credentials and fixed Provider profiles
+# ADR 0002：macOS Keychain 凭据与固定 Provider profiles
 
-- Status: Accepted
-- Accepted: 2026-09-01
-- Date: 2026-09-01
-- Deciders: Weiki886
-- Related: [Issue #16](https://github.com/Weiki886/sight-mcp/issues/16),
-  [ADR 0001](0001-runtime-and-architecture.md), [threat model](../security/threat-model.md)
+**语言 / Language：** 中文 · [English](0002-macos-keychain-provider-profiles.en.md)
 
-## Context
+- 状态：已接受
+- 接受日期：2026-09-01
+- 日期：2026-09-01
+- 决策者：Weiki886
+- 相关：[Issue #16](https://github.com/Weiki886/sight-mcp/issues/16)、
+  [ADR 0001](0001-runtime-and-architecture.md)、[威胁模型](../security/threat-model.md)
 
-ADR 0001 deliberately made the process environment the only source of Provider credentials. That
-boundary is portable and auditable, but it makes a local Claude Code or Codex installation awkward:
-the user must arrange for the key to be exported before every host launch or place it in a plaintext
-host configuration or `.env` file. A repository `.env` is especially easy to copy, back up, log, or
-commit accidentally.
+## 背景
 
-Sight MCP has two documented remote vision targets. Their keys are not interchangeable, and a key
-must not be silently paired with the other Provider's endpoint or model. The solution therefore
-needs both credential storage and an explicit startup-time Provider selection.
+ADR 0001 有意把进程环境变量作为 Provider 凭据的唯一来源。这条边界可移植、可审计，但会让本地的 Claude
+Code 或 Codex 安装变得别扭：用户必须在每次启动宿主前导出密钥，或者把它放进明文的宿主配置或 `.env`
+文件里。而仓库里的 `.env` 尤其容易被复制、备份、记录进日志或误提交。
 
-## Decision
+Sight
+MCP 有两个有文档记录的远程视觉目标。它们的密钥不可互换，且某个密钥绝不能被悄悄配到另一个 Provider 的端点或模型上。因此，解决方案既需要凭据存储，也需要一个显式的、启动时完成的 Provider 选择。
 
-### Fixed profiles
+## 决策
 
-Add `--provider qwen|deepseek`. A selected profile fixes the Provider base URL, model, and default
-reasoning effort as one reviewed unit:
+### 固定 profiles
 
-| Profile    | API root                                            | Model                          | Effort |
-| ---------- | --------------------------------------------------- | ------------------------------ | ------ |
-| `qwen`     | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash`                | `low`  |
-| `deepseek` | `https://api.deepseek.com`                          | `deepseek-v4-flash-vision-exp` | `low`  |
+新增
+`--provider qwen|deepseek`。选定某个 profile 后，Provider 的 API 根地址、模型与默认推理强度会作为一个经过审核的整体被固定下来：
 
-The Tool cannot select or change a profile. Switching profiles requires changing the server
-arguments and restarting the MCP host. There is no automatic fallback.
+| Profile    | API 根地址                                          | 模型                           | 推理强度 |
+| ---------- | --------------------------------------------------- | ------------------------------ | -------- |
+| `qwen`     | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash`                | `low`    |
+| `deepseek` | `https://api.deepseek.com`                          | `deepseek-v4-flash-vision-exp` | `low`    |
 
-When a profile is selected, credential precedence is:
+工具本身无法选择或更改 profile。切换 profile 需要修改服务启动参数并重启 MCP 宿主。不存在任何自动回退。
 
-1. `SIGHT_PROVIDER_API_KEY`, for an explicit one-process override;
-2. `SIGHT_QWEN_API_KEY` or `SIGHT_DEEPSEEK_API_KEY` for the selected profile;
-3. the selected profile's macOS Keychain item.
+选定 profile 后，凭据的优先级为：
 
-Only the selected Provider's profile-specific variable or Keychain account is read. The existing
-no-argument environment configuration remains backward compatible. `SIGHT_PROVIDER_REASONING_EFFORT`
-may explicitly override a profile's default effort; the fixed endpoint and model cannot be
-overridden while the profile is active.
+1. `SIGHT_PROVIDER_API_KEY`，用于显式的单进程覆盖；
+2. 所选 profile 对应的 `SIGHT_QWEN_API_KEY` 或 `SIGHT_DEEPSEEK_API_KEY`；
+3. 所选 profile 对应的 macOS Keychain 条目。
 
-### Credential storage
+只会读取所选 Provider 的专属变量或 Keychain 账户。原有的「不带参数 + 环境变量」配置方式保持向后兼容。`SIGHT_PROVIDER_REASONING_EFFORT`
+可以显式覆盖 profile 的默认推理强度；但在 profile 生效期间，固定的端点与模型不可被覆盖。
 
-On macOS, store each key as a generic-password item with:
+### 凭据存储
 
-- service `dev.weiki886.sight-mcp.provider-api-key`;
-- account `qwen` or `deepseek`.
+在 macOS 上，每个密钥以 generic-password 条目形式存储：
 
-Expose these management commands:
+- service 为 `dev.weiki886.sight-mcp.provider-api-key`；
+- account 为 `qwen` 或 `deepseek`。
+
+对外提供以下管理命令：
 
 ```text
 sight-mcp credentials set qwen|deepseek
@@ -60,66 +56,53 @@ sight-mcp credentials status [qwen|deepseek]
 sight-mcp credentials delete qwen|deepseek [--yes]
 ```
 
-Use the built-in absolute executable `/usr/bin/security`; do not invoke a shell or add a native
-credential dependency. `credentials set` requires an interactive terminal and runs
-`add-generic-password` with the prompt-only `-w` option last. The key is entered directly into the
-system command: it never becomes a Sight MCP command-line argument, shell-history entry, or Node.js
-string during setup.
+使用系统内置的绝对路径可执行文件
+`/usr/bin/security`；不调用 shell，也不引入原生凭据依赖。`credentials set`
+要求交互式终端，并把仅用于提示输入的 `-w` 选项放在 `add-generic-password`
+的最后。密钥直接输入给系统命令：在整个配置过程中，它不会成为 Sight
+MCP 的命令行参数、shell 历史记录条目，也不会成为 Node.js 中的字符串。
 
-Runtime lookup uses an exact service/account query. The child process receives no shell, has a
-15-second deadline, captures only bounded stdout for the requested secret, discards system stderr,
-and maps failures to sanitized application errors. Status checks never request secret output.
-Deletion targets exactly one service/account and requires confirmation unless `--yes` is explicit.
+运行时查询使用精确的 service/account 匹配。子进程不经过 shell，有 15 秒截止时间，只捕获所请求密钥的有界 stdout，丢弃系统 stderr，并把失败映射为脱敏后的应用错误。状态检查绝不请求输出密钥内容。删除操作精确针对单个 service/account，且除非显式加上
+`--yes`，否则需要确认。
 
-The Keychain is an opt-in source activated by `--provider`; Sight MCP still does not search the
-repository or current directory for secrets. On non-macOS systems the existing environment mode and
-profile-specific environment variables remain available. A missing, locked, or unavailable Keychain
-fails closed and never triggers a different credential or Provider fallback.
+Keychain 是由 `--provider` 激活的可选来源；Sight
+MCP 依然不会在仓库或当前目录中搜索密钥。在非 macOS 系统上，原有的环境变量模式与 profile 专属环境变量仍然可用。Keychain 缺失、锁定或不可用时会失败即关闭，绝不会触发切换到其它凭据或 Provider 的回退。
 
-## Consequences
+## 影响
 
-### Positive
+### 正面
 
-- Routine host startup no longer needs a plaintext API key or a pre-launch export step on macOS.
-- Provider, endpoint, model, and credential account are selected as one explicit profile.
-- Setup avoids putting the key in shell history, process arguments, logs, or repository files.
-- The implementation uses an operating-system facility without adding a native addon or production
-  package dependency.
-- Generic OpenAI-compatible endpoints and non-macOS installations keep the established environment
-  interface.
+- 在 macOS 上，日常启动宿主不再需要明文 API 密钥，也不需要启动前的导出步骤。
+- Provider、端点、模型与凭据账户作为一个显式 profile 被整体选定。
+- 配置过程避免把密钥留在 shell 历史、进程参数、日志或仓库文件中。
+- 实现借助操作系统能力完成，没有引入原生插件或生产依赖包。
+- 通用 OpenAI 兼容端点与非 macOS 安装保持既有的环境变量接口。
 
-### Negative
+### 负面
 
-- Native secure storage is macOS-specific in v0.1.0; other platforms still need environment
-  injection or a local unauthenticated endpoint.
-- The system may display a Keychain access prompt at setup or runtime according to local policy.
-- Built-in profiles are intentionally less flexible than generic mode and must be updated when a
-  Provider changes its public endpoint or model identifier.
-- A same-user compromised process may still be able to request an accessible Keychain item.
+- v0.1.0 中原生安全存储仅限 macOS；其它平台仍需环境变量注入或本地免认证端点。
+- 系统可能会依据本地策略，在配置或运行时弹出 Keychain 访问提示。
+- 内置 profile 有意做得不如通用模式灵活，且当 Provider 变更其公开端点或模型标识时必须更新。
+- 同一用户下被攻陷的进程，仍有可能请求到可访问的 Keychain 条目。
 
-## Rejected alternatives
+## 已否决的备选方案
 
-- Repository or automatically loaded `.env`: plaintext at rest and easy to copy, back up, log, or
-  commit; current-directory discovery is also surprising.
-- Putting the key directly in `.mcp.json` or `config.toml`: exposes it to host configuration,
-  diagnostics, backups, and accidental sharing.
-- A launcher shell script: reduces typing but leaves credential injection and shell-history risks to
-  user-maintained code.
-- An encrypted project file: the application would also need to store or obtain its decryption key,
-  recreating the original secret-management problem.
-- `keytar` or another native addon: adds packaging and supply-chain cost before a second operating
-  system backend is justified.
-- Automatic Provider fallback: could disclose an image to an unselected operator and amplify cost.
+- 仓库内或自动加载的
+  `.env`：静态存储为明文，容易被复制、备份、记录或提交；按当前目录自动发现的行为也令人意外。
+- 把密钥直接写进 `.mcp.json` 或 `config.toml`：会暴露给宿主配置、诊断信息、备份以及意外分享。
+- 启动器 shell 脚本：减少了输入量，但把凭据注入与 shell 历史风险留给了用户自行维护的代码。
+- 加密的项目文件：应用同样需要存储或获取解密密钥，等于把原来的密钥管理问题重新制造了一遍。
+- `keytar` 或其它原生插件：在第二个操作系统后端尚不具备充分理由之前，就先付出打包与供应链成本。
+- 自动 Provider 回退：可能把图片泄露给未被选中的运营方，并放大费用。
 
-## Compliance
+## 合规检查
 
-Implementation conforms to this ADR when:
+实现满足以下条件时即符合本 ADR：
 
-- profile parsing is closed to `qwen` and `deepseek`, and invalid input fails before MCP startup;
-- fixed endpoint/model mappings and credential precedence have direct tests;
-- Keychain subprocess arguments use exact service/account values, `shell: false`, bounded output,
-  bounded duration, and sanitized failures;
-- interactive setup contains no secret argument and status does not read secret output;
-- deletion requires confirmation or `--yes` and cannot use a wildcard target;
-- the no-argument environment configuration and protocol-only stdout behavior remain compatible;
-- documentation includes migration, non-macOS fallback, and deletion instructions.
+- profile 解析封闭于 `qwen` 与 `deepseek`，非法输入在 MCP 启动前即失败；
+- 固定的端点/模型映射与凭据优先级都有直接测试覆盖；
+- Keychain 子进程参数使用精确的 service/account 值、`shell: false`、有界输出、有界时长与脱敏失败；
+- 交互式配置不包含密钥参数，状态检查不读取密钥输出；
+- 删除操作需要确认或 `--yes`，且不能使用通配目标；
+- 「不带参数 + 环境变量」配置方式与「stdout 仅协议流量」行为保持兼容；
+- 文档包含迁移说明、非 macOS 回退方案与删除指引。

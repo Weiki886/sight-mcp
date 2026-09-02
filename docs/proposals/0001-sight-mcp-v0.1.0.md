@@ -1,141 +1,119 @@
-# Proposal 0001: Sight MCP v0.1.0
+# 提案 0001：Sight MCP v0.1.0
 
-- Status: Accepted
-- Accepted: 2026-08-28
-- Date: 2026-08-28
-- Owner: Weiki886
-- Tracking: [Issue #1](https://github.com/Weiki886/sight-mcp/issues/1)
-- Milestone: [`v0.1.0 — MVP`](https://github.com/Weiki886/sight-mcp/milestone/1)
+**语言 / Language：** 中文 · [English](0001-sight-mcp-v0.1.0.en.md)
 
-## Users and scenario
+- 状态：已接受
+- 接受日期：2026-08-28
+- 撰写日期：2026-08-28
+- 负责人：Weiki886
+- 跟踪：[Issue #1](https://github.com/Weiki886/sight-mcp/issues/1)
+- 里程碑：[`v0.1.0 — MVP`](https://github.com/Weiki886/sight-mcp/milestone/1)
 
-The primary user runs Claude Code, Codex, or another MCP host with a text-only model. When a task
-refers to a screenshot, diagram, chart, scanned document, or other image, the host model cannot
-inspect the pixels itself.
+## 用户与场景
 
-Sight MCP supplies a narrow bridge:
+核心用户在 Claude Code、Codex 或其他 MCP
+Host 中运行纯文本模型。当任务涉及截图、示意图、图表、扫描件或其他图片时，Host 模型自身无法查看像素。
 
-1. The host model calls `analyze_image` with a local path and a question.
-2. Sight MCP authorizes and validates the file.
-3. Sight MCP normalizes the image within resource limits.
-4. A configured vision provider analyzes the image.
-5. Sight MCP returns readable text and a structured result to the text-only model.
+Sight MCP 提供一条收窄的桥接：
 
-The user selects and operates the vision endpoint. Sight MCP does not contain a model and does not
-train or host one.
+1. Host 模型带上本地路径与问题调用 `analyze_image`。
+2. Sight MCP 对该文件做授权与校验。
+3. Sight MCP 在资源限额内对图片做归一化。
+4. 配置好的视觉 Provider 分析这张图片。
+5. Sight MCP 把可读文本与结构化结果返回给纯文本模型。
 
-## Problem and value
+视觉端点由用户自行选择与运维。Sight MCP 不包含模型，也不训练或托管模型。
 
-Existing vision MCP servers prove the bridge pattern, but commonly optimize for only one of these
-goals: small implementation size, broad media support, provider flexibility, or security. Sight MCP
-should combine the useful parts without inheriting unsafe defaults or an oversized first release.
+## 问题与价值
 
-The v0.1.0 value is a dependable, reviewable path from a local image to a provider-neutral text
-result that works the same way in Claude Code and Codex.
+已有的视觉 MCP 服务器验证了这种桥接范式，但通常只在其中一个目标上做优化：实现体积小、媒体支持广、Provider 灵活，或者安全性好。Sight
+MCP 应当吸收这些有用的部分，同时不继承不安全的默认值，也不做过于臃肿的首个版本。
 
-## Evidence from related projects
+v0.1.0 的价值在于：提供一条可靠、可评审的路径，把本地图片变成与 Provider 无关的文本结果，且在 Claude
+Code 与 Codex 中表现一致。
 
-The design was informed by the following public projects:
+## 来自相关项目的参考
 
-- [Winterfellwen/vision-mcp](https://github.com/Winterfellwen/vision-mcp): image normalization, rate
-  limiting, bounded retries, queueing, comparison, and OpenAI-compatible APIs.
-- [joshsssn/mcp-vision-server](https://github.com/joshsssn/mcp-vision-server): a small stdio bridge
-  and straightforward support for Ollama, LM Studio, vLLM, and remote OpenAI-compatible endpoints.
-- [xiaoshengwpp/mcp-server-vision](https://github.com/xiaoshengwpp/mcp-server-vision): provider
-  abstraction, allowed paths, richer image/video features, strict typing, and a documented security
-  posture.
-- [look4yo/claudecode-vision-mcp](https://github.com/look4yo/claudecode-vision-mcp): a clear
-  before/after demonstration of a text-only model using a vision tool.
+设计参考了以下公开项目：
 
-Sight MCP will adopt the bridge, preprocessing, local-provider, retry, and explicit path-policy
-ideas. It will not adopt implicit proxying, arbitrary URL input, unbounded feature growth,
-cwd-loaded plaintext credentials, or a global single-request queue as defaults.
+- [Winterfellwen/vision-mcp](https://github.com/Winterfellwen/vision-mcp)：图像归一化、限流、有界重试、排队、对比以及 OpenAI 兼容 API。
+- [joshsssn/mcp-vision-server](https://github.com/joshsssn/mcp-vision-server)：小巧的 stdio 桥接，以及对 Ollama、LM
+  Studio、vLLM 和远端 OpenAI 兼容端点的直接支持。
+- [xiaoshengwpp/mcp-server-vision](https://github.com/xiaoshengwpp/mcp-server-vision)：Provider 抽象、允许路径、更丰富的图像/视频能力、严格类型以及成文的安全姿态。
+- [look4yo/claudecode-vision-mcp](https://github.com/look4yo/claudecode-vision-mcp)：清晰演示了纯文本模型使用视觉工具的前后对比。
 
-## Chosen solution
+Sight
+MCP 会采纳桥接、预处理、本地 Provider、重试与显式路径策略这些思路，不会采纳隐式代理、任意 URL 输入、无节制的功能膨胀、从当前工作目录加载明文凭据，以及默认使用全局单请求队列这些做法。
 
-Build a TypeScript, ESM, stdio-first MCP server using the official MCP TypeScript SDK v2 and Zod v4.
+## 选定方案
 
-The first release exposes exactly one public tool, `analyze_image`, and exactly one provider type,
-`openai-compatible`. The provider implementation is behind a neutral interface so later providers do
-not change the tool contract.
+基于官方 MCP TypeScript SDK v2 与 Zod v4，构建一个 TypeScript、ESM、以 stdio 为先的 MCP 服务器。
 
-The supported input is a local absolute path beneath an authorized root. URL input, raw base64
-input, multi-image comparison, OCR-specific tools, and video are deliberately excluded until their
-user value and security boundaries are validated.
+首个版本只对外暴露一个公开工具 `analyze_image`，只支持一种 Provider 类型
+`openai-compatible`。Provider 实现位于中立接口之后，因此后续新增 Provider 不会改动工具契约。
 
-## Alternatives considered
+受支持的输入是位于授权根目录之下的本地绝对路径。URL 输入、原始 base64 输入、多图对比、OCR 专用工具与视频都被有意排除，直到它们的用户价值与安全边界得到验证。
 
-### Python core
+## 已考虑的备选方案
 
-Python has excellent Pillow, OpenCV, OCR, and local-model ecosystems. It was not selected because
-v0.1.0 is a protocol and HTTP bridge rather than a model-runtime project. Requiring Python
-environments would also make installation in coding hosts less predictable. A future optional Python
-sidecar remains possible for capabilities that materially need it.
+### Python 内核
 
-### Plain JavaScript
+Python 拥有优秀的 Pillow、OpenCV、OCR 与本地模型生态。没有选它是因为 v0.1.0 是一个协议与 HTTP 桥接项目，而不是模型运行时项目。要求用户具备 Python 环境也会让在编码 Host 中的安装变得不可预期。未来若某些能力确有需要，仍可增加可选的 Python 边车进程。
 
-Plain JavaScript would reduce initial compiler setup. It was rejected because tool schemas,
-configuration, provider results, and stable error unions are public boundaries that benefit from
-compile-time checking.
+### 纯 JavaScript
 
-### Go or Rust
+纯 JavaScript 能减少初期的编译器配置。被否决的原因是：工具 schema、配置、Provider 结果与稳定的错误联合类型都是公开边界，编译期检查对它们很有价值。
 
-Both can produce compact binaries and strong runtime guarantees. They were rejected for the first
-release because the official TypeScript SDK provides the shortest path to current MCP features, host
-examples, and npm distribution. They remain valid alternatives if startup, footprint, or
-single-binary distribution becomes a measured constraint.
+### Go 或 Rust
 
-### Multiple tools in v0.1.0
+两者都能产出紧凑的二进制并提供更强的运行时保证。首个版本没有选它们，是因为官方 TypeScript
+SDK 是通向当前 MCP 特性、Host 示例与 npm 分发的最短路径。如果启动速度、体积或单二进制分发成为可度量的约束，它们仍是有效的备选。
 
-Separate `describe_image`, `extract_text`, and `compare_images` tools are easy to understand but
-duplicate input, security, and provider behavior. A single prompt-driven tool is enough to validate
-the bridge. Specialized tools should only be added when evaluations show that tool selection or
-output quality improves.
+### v0.1.0 提供多个工具
 
-### HTTP-first server
+分开的 `describe_image`、`extract_text`、`compare_images`
+工具容易理解，但会重复输入、安全与 Provider 行为。一个由提示词驱动的工具足以验证这条桥接。只有当评测显示工具选择或输出质量确有改善时，才应加入专用工具。
 
-Streamable HTTP is useful for shared remote deployments. It adds authentication, authorization,
-origin/host validation, service operation, and network exposure that are unnecessary for a local
-coding-host MVP. The application core remains transport-independent so HTTP can be proposed later.
+### HTTP 优先的服务器
 
-## v0.1.0 scope
+Streamable
+HTTP 适合共享的远端部署，但它会引入认证、授权、Origin/Host 校验、服务运维与网络暴露面，这些对本地编码 Host 的 MVP 来说并不必要。应用内核保持与传输无关，因此 HTTP 可以在后续提案中引入。
 
-### Included
+## v0.1.0 范围
 
-- TypeScript strict-mode ESM project on supported Node.js LTS releases.
-- Official `@modelcontextprotocol/server` v2 package and stdio transport.
-- One `analyze_image` tool with versioned structured results and a text fallback.
-- Local absolute paths authorized against canonical allowed roots.
-- PNG, JPEG, and WebP decoding through `sharp`.
-- Orientation normalization, metadata removal, bounded resizing, and opaque/alpha-aware encoding.
-- One OpenAI-compatible `/chat/completions` vision provider.
-- Environment-based configuration with validation and secret redaction.
-- Cancellation, deadlines, bounded concurrency, bounded queueing, and transient retry policy.
-- Unit, provider-contract, MCP integration, packaging, and real-host smoke-test plans.
-- npm package and `npx` execution path.
+### 包含
 
-### Excluded
+- 在受支持的 Node.js LTS 版本上运行的 TypeScript 严格模式 ESM 项目。
+- 官方 `@modelcontextprotocol/server` v2 包与 stdio 传输。
+- 一个 `analyze_image` 工具，提供带版本的结构化结果与文本兜底。
+- 按规范化允许根目录授权的本地绝对路径。
+- 通过 `sharp` 解码 PNG、JPEG、WebP。
+- 方向归一化、元数据移除、有界缩放，以及区分不透明/带 alpha 的编码。
+- 一个 OpenAI 兼容的 `/chat/completions` 视觉 Provider。
+- 基于环境变量的配置，带校验与密钥脱敏。
+- 取消、截止时间、有界并发、有界排队与瞬时错误重试策略。
+- 单元测试、Provider 契约测试、MCP 集成测试、打包验证与真实 Host 冒烟测试计划。
+- npm 包与 `npx` 执行路径。
 
-- Built-in model inference or model downloads.
-- URL, data URL, raw base64, stdin image bytes, directories, globbing, and archives.
-- GIF, SVG, PDF, HEIC, TIFF, RAW formats, video, audio, or multi-image calls.
-- Provider selection per tool invocation, failover, load balancing, or fallback to a different
-  endpoint.
-- Anthropic-native, Gemini-native, or other vendor-specific adapters.
-- SSE, legacy SSE, or Streamable HTTP server transports.
-- GUI automation, screenshots captured by the server, OCR engines, image generation, or image
-  editing.
-- Persistent cache, conversation memory, telemetry, analytics, or a background daemon.
-- Corporate proxy configuration beyond runtime-standard networking behavior.
+### 排除
 
-### Distribution-name constraint
+- 内置模型推理或模型下载。
+- URL、data URL、原始 base64、stdin 图像字节、目录、通配符与压缩包。
+- GIF、SVG、PDF、HEIC、TIFF、RAW 格式、视频、音频或多图调用。
+- 按工具调用逐次选择 Provider、故障转移、负载均衡，或回退到另一个端点。
+- Anthropic 原生、Gemini 原生或其他厂商专有适配器。
+- SSE、旧版 SSE 或 Streamable HTTP 服务端传输。
+- GUI 自动化、由服务器抓取截图、OCR 引擎、图像生成或图像编辑。
+- 持久缓存、会话记忆、遥测、分析或后台守护进程。
+- 超出运行时标准网络行为的企业代理配置。
 
-The unscoped npm name `sight-mcp` is already occupied (observed as version `1.0.4` on 2026-08-28).
-The scaffold Issue must select and verify a publishable scoped package name before treating package
-metadata as public. Documentation uses a package-name placeholder until that decision is recorded;
-the GitHub project and product name remain Sight MCP.
+### 分发名称约束
 
-## Architecture
+无 scope 的 npm 名称 `sight-mcp` 已被占用（2026-08-28 观察到版本为
+`1.0.4`）。脚手架 Issue 必须先选定并验证一个可发布的 scoped 包名，之后才能把包元数据视为公开信息。在该决定被记录之前，文档中使用包名占位符；GitHub 项目名与产品名仍为 Sight
+MCP。
+
+## 架构
 
 ```text
 Claude Code / Codex
@@ -157,131 +135,104 @@ InputGuard  ImagePipeline  VisionProvider
 filesystem    sharp       HTTPS / loopback HTTP
 ```
 
-Dependency direction is inward. MCP types stop at the tool adapter; vendor response types stop at
-the provider adapter; filesystem and `sharp` details stop at their adapters. The application service
-coordinates typed domain inputs and results.
+依赖方向向内。MCP 类型止步于工具适配器；厂商响应类型止步于 Provider 适配器；文件系统与 `sharp`
+的细节止步于各自的适配器。应用服务只协调带类型的领域输入与结果。
 
-The request lifecycle is:
+请求生命周期如下：
 
-1. Zod validates the MCP arguments.
-2. `InputGuard` requires an absolute path, resolves its canonical target, confirms it is within an
-   allowed root, opens a regular file, and enforces a streaming byte limit.
-3. `ImagePipeline` performs a bounded decode, rejects unsupported formats and pixel/dimension
-   limits, normalizes orientation, strips metadata, resizes without enlargement, and emits JPEG for
-   opaque images or PNG for images requiring alpha. Both dimensions and transmitted bytes are
-   bounded.
-4. `VisionProvider` sends the prompt and a data URL to the configured endpoint with an
-   `AbortSignal`, no redirects, a bounded response body, and sanitized error mapping.
-5. The tool returns a versioned object. Its readable text explicitly labels image/provider content
-   as untrusted. It never returns the local path, source bytes, base64 data, credentials, headers,
-   or raw upstream body.
-6. All diagnostics go to stderr. stdout remains exclusively the MCP protocol stream.
+1. Zod 校验 MCP 参数。
+2. `InputGuard`
+   要求绝对路径，解析其规范化目标，确认位于允许根目录内，打开常规文件，并施加流式字节上限。
+3. `ImagePipeline`
+   执行有界解码，拒绝不支持的格式与超出像素/尺寸限额的输入，归一化方向，剥离元数据，只缩小不放大，并对不透明图片输出 JPEG、对需要 alpha 的图片输出 PNG。尺寸与传输字节都有上界。
+4. `VisionProvider` 带上 `AbortSignal`，把提示词与 data
+   URL 发送到配置好的端点，不跟随重定向，限制响应体大小，并做脱敏的错误映射。
+5. 工具返回一个带版本的对象。其可读文本会明确标注图像/Provider 内容为不可信，且绝不返回本地路径、源字节、base64 数据、凭据、请求头或上游原始响应体。
+6. 所有诊断信息走 stderr。stdout 只保留给 MCP 协议流。
 
-## Public contract
+## 公开契约
 
-The normative tool, output, errors, provider interface, cancellation, and compatibility rules are in
-[the vision tool contract](../specs/vision-tool-contract.md).
+规范性的工具、输出、错误、Provider 接口、取消与兼容性规则见[视觉工具契约](../specs/vision-tool-contract.md)。
 
-The normative environment variables, defaults, URL policy, and validation rules are in
-[the configuration specification](../specs/configuration.md).
+规范性的环境变量、默认值、URL 策略与校验规则见[配置规范](../specs/configuration.md)。
 
-## Security and privacy
+## 安全与隐私
 
-The image itself, unrelated local files, provider credentials, and returned analysis are protected
-assets. Sending an image to a remote provider is an intentional disclosure and must be visible in
-documentation and configuration.
+图片本身、无关的本地文件、Provider 凭据以及返回的分析结果都是受保护资产。把图片发送给远端 Provider 是一次有意的信息披露，必须在文档与配置中清晰可见。
 
-The implementation must satisfy the controls in [the threat model](../security/threat-model.md),
-including canonical path authorization, symlink handling, bounded decoding, content-based format
-detection, redirect denial, secret redaction, prompt-injection treatment, dependency review, and
-protocol-stream integrity.
+实现必须满足[威胁模型](../security/threat-model.md)中的各项控制，包括规范化路径授权、symlink 处理、有界解码、基于内容的格式识别、拒绝重定向、密钥脱敏、提示注入处理、依赖评审与协议流完整性。
 
-The v0.1.0 runtime is a local, single-user developer tool. It is not a multi-tenant sandbox and does
-not defend against an attacker who already has the same operating-system account and can
-continuously mutate authorized files. Residual local TOCTOU limitations must be documented and
-minimized by opening and reading the resolved file through one bounded file-handle lifecycle.
+v0.1.0 运行时是本地单用户的开发者工具，不是多租户沙箱，也不防御那些已经拥有同一操作系统账号、并能持续篡改授权文件的攻击者。残留的本地 TOCTOU 限制必须被记录，并通过在同一个有界文件句柄生命周期内打开并读取已解析文件来尽量降低。
 
-## Quality and delivery
+## 质量与交付
 
-[The test and delivery strategy](../testing/strategy.md) defines:
+[测试与交付策略](../testing/strategy.md)定义了：
 
-- unit tests for every external boundary and security decision;
-- deterministic provider contract tests without paid endpoints;
-- a spawned stdio MCP integration suite;
-- packaging verification from the packed tarball;
-- manual release smoke tests in current Claude Code and Codex versions;
-- CI permission, third-party Action pinning, dependency review, and artifact evidence expectations.
+- 覆盖每个外部边界与安全决策的单元测试；
+- 不依赖付费端点的确定性 Provider 契约测试；
+- 拉起子进程的 stdio MCP 集成测试套件；
+- 基于打包 tarball 的打包验证；
+- 在当前版本 Claude Code 与 Codex 中的人工发布冒烟测试；
+- CI 权限、第三方 Action 固定、依赖评审与产物证据要求。
 
-No numerical coverage threshold is set before a baseline exists. Missing branch coverage in
-security-critical modules blocks release regardless of an aggregate percentage.
+在基线数据出现之前不设定覆盖率数值门槛。安全关键模块中缺失的分支覆盖会阻塞发布，与总体百分比无关。
 
-## Compatibility and versioning
+## 兼容性与版本管理
 
-Tool names, input schemas, output schemas, stable error codes, CLI flags, and environment keys are
-public interfaces. v0.x may change them only with release notes and migration guidance. After 1.0,
-incompatible changes require a major release.
+工具名、输入 schema、输出 schema、稳定错误码、CLI 参数与环境变量键都是公开接口。v0.x 阶段只有在提供发布说明与迁移指引时才可变更它们。1.0 之后，不兼容变更需要发布主版本。
 
-The structured result includes `schemaVersion: "1"`. Older MCP clients still receive a text content
-block. The v0.1.0 structured result remains an object even though the current MCP specification
-permits other JSON values, preserving compatibility with older hosts.
+结构化结果包含
+`schemaVersion: "1"`。较旧的 MCP 客户端仍会收到文本内容块。即便当前 MCP 规范允许其他 JSON 值，v0.1.0 的结构化结果仍保持为对象，以兼容较旧的 Host。
 
-## Observability and operation
+## 可观测性与运维
 
-The server is ephemeral and local. It emits structured, redacted diagnostics to stderr with request
-ID, stage, duration, outcome, stable error code, retry count, and queue duration. It does not log
-full file paths, prompts, image data, credentials, authorization headers, or provider response
-bodies.
+服务器是本地、短生命周期的。它向 stderr 输出结构化且脱敏的诊断信息，包含 request
+ID、阶段、耗时、结果、稳定错误码、重试次数与排队时长，不记录完整文件路径、提示词、图像数据、凭据、Authorization 请求头或 Provider 响应体。
 
-No telemetry leaves the machine. A future telemetry proposal must be opt-in and independently
-reviewed.
+没有任何遥测数据离开本机。未来若有遥测提案，必须是选择加入的，并经过独立评审。
 
-## Delivery slices
+## 交付切片
 
-Implementation should proceed as small, dependency-ordered Issues:
+实现应按依赖顺序拆成小的 Issue 推进：
 
-1. [#2: TypeScript/MCP project scaffold and CI foundation](https://github.com/Weiki886/sight-mcp/issues/2).
-2. [#3: Secure local image authorization and preprocessing](https://github.com/Weiki886/sight-mcp/issues/3).
-3. [#4: OpenAI-compatible provider adapter and resilience policy](https://github.com/Weiki886/sight-mcp/issues/4).
-4. [#5: `analyze_image` application service and MCP tool integration](https://github.com/Weiki886/sight-mcp/issues/5).
-5. [#6: Claude Code/Codex compatibility, packaging, documentation, and v0.1.0 release readiness](https://github.com/Weiki886/sight-mcp/issues/6).
+1. [#2：TypeScript/MCP 项目脚手架与 CI 基础](https://github.com/Weiki886/sight-mcp/issues/2)。
+2. [#3：本地图片的安全授权与预处理](https://github.com/Weiki886/sight-mcp/issues/3)。
+3. [#4：OpenAI 兼容 Provider 适配器与韧性策略](https://github.com/Weiki886/sight-mcp/issues/4)。
+4. [#5：`analyze_image` 应用服务与 MCP 工具集成](https://github.com/Weiki886/sight-mcp/issues/5)。
+5. [#6：Claude Code/Codex 兼容性、打包、文档与 v0.1.0 发布就绪](https://github.com/Weiki886/sight-mcp/issues/6)。
 
-## Acceptance criteria
+## 验收标准
 
-- [ ] A reviewer can trace every in-scope behavior to a normative contract or configuration rule.
-- [ ] The tool contract has a closed input schema, versioned success/error outputs, stable error
-      categories, cancellation, and timeout semantics.
-- [ ] The provider is replaceable without importing MCP types or changing the public tool schema.
-- [ ] The threat model covers filesystem, decoder, network, provider, prompt-injection, logging,
-      cost, dependency, and stdout integrity risks.
-- [ ] The test matrix covers unit, contract, integration, packaging, and both target hosts.
-- [ ] Each delivery slice has a linked, independently verifiable Issue in the v0.1.0 milestone.
-- [ ] The proposal receives an explicit human acceptance record before runtime implementation
-      starts.
+- [ ] 评审者能把每一项范围内行为追溯到某条规范性契约或配置规则。
+- [ ] 工具契约具备封闭的输入 schema、带版本的成功/错误输出、稳定的错误分类、取消与超时语义。
+- [ ] Provider 可被替换，无需引入 MCP 类型，也不改动公开工具 schema。
+- [ ] 威胁模型覆盖文件系统、解码器、网络、Provider、提示注入、日志、成本、依赖与 stdout 完整性风险。
+- [ ] 测试矩阵覆盖单元、契约、集成、打包以及两个目标 Host。
+- [ ] 每个交付切片在 v0.1.0 里程碑中都有可独立验证的关联 Issue。
+- [ ] 在运行时实现开始之前，提案获得明确的人工接受记录。
 
-## Risks and validation plan
+## 风险与验证计划
 
-| Assumption or risk                                 | Validation                                                                                                   | Exit or change condition                                                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| One prompt-driven tool is selected reliably        | Run the same image-question fixture in Claude Code and Codex                                                 | Add specialized tools only if repeated selection or prompting failures are observed                          |
-| OpenAI-compatible APIs cover the first user set    | Contract-test representative response shapes; manually test one local and one remote endpoint before release | Propose a new adapter when compatibility shims would leak vendor behavior into the tool contract             |
-| `sharp` provides safe-enough bounded preprocessing | Test bytes, pixels, dimensions, malformed inputs, alpha, orientation, and cancellation behavior              | Replace or isolate decoding if limits cannot be enforced before costly allocation                            |
-| Environment-only configuration is usable           | Validate project and user-level host examples on macOS, Linux, and Windows syntax                            | Add a config file only if environment blocks prove unmanageable                                              |
-| A clear npm distribution identity is available     | Verify ownership and publishability of a scoped package name before scaffold metadata is accepted            | Record a naming decision or choose an alternate scope; do not publish over the unrelated `sight-mcp` package |
-| Text plus structured output works across hosts     | Spawn an SDK client and run current host smoke tests                                                         | Preserve the text fallback; revise structured fields only through versioned schema evolution                 |
+| 假设或风险                       | 验证方式                                                             | 退出或调整条件                                              |
+| -------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 单个提示词驱动的工具能被可靠选中 | 在 Claude Code 与 Codex 中运行同一组图片-问题素材                    | 只有在反复出现选择或提示失败时才加入专用工具                |
+| OpenAI 兼容 API 覆盖首批用户     | 对代表性响应形态做契约测试；发布前手动测试一个本地端点与一个远端端点 | 当兼容性补丁会把厂商行为泄漏进工具契约时，另行提案新适配器  |
+| `sharp` 提供足够安全的有界预处理 | 测试字节数、像素、尺寸、畸形输入、alpha、方向与取消行为              | 若无法在昂贵分配之前施加限额，则替换或隔离解码              |
+| 仅用环境变量配置是可用的         | 在 macOS、Linux 与 Windows 语法下验证项目级与用户级 Host 示例        | 只有当环境变量方式确实难以管理时才引入配置文件              |
+| 存在清晰可用的 npm 分发身份      | 在接受脚手架元数据之前，验证某个 scoped 包名的归属与可发布性         | 记录命名决定或改用其他 scope；绝不覆盖无关的 `sight-mcp` 包 |
+| 文本加结构化输出在各 Host 中可用 | 拉起 SDK 客户端并运行当前的 Host 冒烟测试                            | 保留文本兜底；结构化字段只通过带版本的 schema 演进来修改    |
 
-## Decision and safety impact
+## 决策与安全影响
 
-- ADR: required; see [ADR 0001](../adr/0001-runtime-and-architecture.md).
-- Threat model: required; see [the v0.1.0 threat model](../security/threat-model.md).
-- Runtime risk after acceptance: high, because the implementation reads local files, handles
-  secrets, invokes an external service, and publishes an MCP tool contract.
-- Proposal change risk: low; this document changes no runtime behavior and can be reverted or
-  superseded.
+- ADR：必需，见 [ADR 0001](../adr/0001-runtime-and-architecture.md)。
+- 威胁模型：必需，见 [v0.1.0 威胁模型](../security/threat-model.md)。
+- 接受后的运行时风险：高，因为实现会读取本地文件、处理密钥、调用外部服务并发布 MCP 工具契约。
+- 提案本身的变更风险：低；本文档不改变任何运行时行为，可被回退或取代。
 
-## References
+## 参考资料
 
-- [MCP TypeScript SDK v2 package guidance](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/get-started/packages.md)
-- [MCP 2026-07-28 tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)
-- [MCP 2026-07-28 transports specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)
-- [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)
-- [Codex MCP documentation](https://developers.openai.com/codex/mcp)
+- [MCP TypeScript SDK v2 包指引](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/get-started/packages.md)
+- [MCP 2026-07-28 工具规范](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)
+- [MCP 2026-07-28 传输规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)
+- [Claude Code MCP 文档](https://code.claude.com/docs/en/mcp)
+- [Codex MCP 文档](https://developers.openai.com/codex/mcp)

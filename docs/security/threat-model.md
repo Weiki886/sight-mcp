@@ -1,57 +1,53 @@
-# Sight MCP v0.1.0 threat model
+# Sight MCP v0.1.0 威胁模型
 
-- Status: Accepted
-- Accepted: 2026-08-28
-- Date: 2026-08-28
-- Amended: 2026-09-01 by Issue #16 (Keychain profiles) and clipboard image input
-- Runtime risk: High
-- Scope: local stdio server, local file and macOS clipboard image input, `sharp` preprocessing, one
-  OpenAI-compatible vision provider, built-in Provider profiles, and optional macOS Keychain
-  credentials
-- Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.md),
-  [tool contract](../specs/vision-tool-contract.md), [configuration](../specs/configuration.md),
+**语言 / Language：** 中文 · [English](threat-model.en.md)
+
+- 状态：已接受
+- 接受日期：2026-08-28
+- 日期：2026-08-28
+- 修订：2026-09-01，依据 Issue #16（Keychain profiles）与剪切板图像输入
+- 运行时风险：高
+- 范围：本地 stdio 服务、本地文件与 macOS 剪切板图像输入、`sharp`
+  预处理、一个 OpenAI 兼容视觉 Provider、内置 Provider profiles，以及可选的 macOS Keychain 凭据
+- 相关：[提案 0001](../proposals/0001-sight-mcp-v0.1.0.md)、
+  [工具契约](../specs/vision-tool-contract.md)、[配置规范](../specs/configuration.md)、
   [ADR 0002](../adr/0002-macos-keychain-provider-profiles.md)
 
-## Security objectives
+## 安全目标
 
-1. Read only the local image the user has made reachable through an allowed root.
-2. Never send an image to a destination other than the explicitly configured provider.
-3. Keep credentials, local paths, image bytes, prompts, and raw upstream responses out of logs and
-   public errors.
-4. Bound CPU, memory, file descriptors, queue growth, network duration, retries, response size, and
-   provider cost amplification.
-5. Preserve the MCP stdio protocol channel and return deterministic, sanitized errors.
-6. Treat image content and provider output as untrusted data, not executable instructions.
+1. 只读取用户通过允许根目录明确开放的本地图片。
+2. 绝不把图片发送到显式配置的 Provider 之外的任何目的地。
+3. 让凭据、本地路径、图像字节、prompt 与上游原始响应都不进入日志和对外错误。
+4. 限制 CPU、内存、文件描述符、队列增长、网络时长、重试、响应大小以及 Provider 费用放大。
+5. 保护 MCP stdio 协议通道，并返回确定性的、已脱敏的错误。
+6. 把图像内容与 Provider 输出视为不可信数据，而非可执行指令。
 
-## Assets
+## 资产
 
-- Contents and metadata of the selected image.
-- Contents and names of unrelated local files.
-- Provider API key and endpoint configuration.
-- Provider profile selection and macOS Keychain item metadata.
-- The user's prompt and the provider's answer.
-- Provider quota, billing, and availability.
-- Host and server process availability.
-- Integrity of the MCP protocol stream and public tool contract.
-- Dependency and release provenance.
+- 所选图片的内容与元数据。
+- 无关本地文件的内容与文件名。
+- Provider API 密钥与端点配置。
+- Provider profile 选择与 macOS Keychain 条目元数据。
+- 用户的 prompt 与 Provider 的答案。
+- Provider 配额、计费与可用性。
+- 宿主与服务进程的可用性。
+- MCP 协议流与公开工具契约的完整性。
+- 依赖与发布的来源可信度。
 
-## Actors
+## 参与方
 
-- User: chooses host configuration, allowed roots, provider, image, and task.
-- Host model: untrusted planner that selects the MCP tool and supplies arguments.
-- Local MCP host: launches the server and transports calls/cancellation.
-- Local filesystem: contains authorized and unauthorized data and may contain links or special
-  files.
-- Image decoder: native `sharp`/libvips dependency processing attacker-controlled bytes.
-- Vision provider: separately operated local or remote service; its output is untrusted.
-- Network attacker: relevant for remote provider traffic and dependency/package retrieval.
-- Repository contributor or compromised dependency: potential supply-chain actor.
-- macOS Keychain and `securityd`: operating-system credential boundary used by an explicitly
-  selected profile.
-- macOS system clipboard and `osascript`: native source and consent boundary used by
-  `analyze_clipboard_image`.
+- 用户：选择宿主配置、允许根目录、Provider、图片与任务。
+- 宿主模型：不可信的规划方，负责选择 MCP 工具并提供参数。
+- 本地 MCP 宿主：启动服务并传输调用与取消。
+- 本地文件系统：包含已授权与未授权数据，可能存在链接或特殊文件。
+- 图像解码器：处理攻击者可控字节的原生 `sharp`/libvips 依赖。
+- 视觉 Provider：独立运营的本地或远程服务；其输出不可信。
+- 网络攻击者：与远程 Provider 流量及依赖/包获取相关。
+- 仓库贡献者或被攻陷的依赖：潜在的供应链参与方。
+- macOS Keychain 与 `securityd`：由显式选定的 profile 使用的操作系统凭据边界。
+- macOS 系统剪切板与 `osascript`：`analyze_clipboard_image` 使用的原生来源与同意边界。
 
-## Trust boundaries
+## 信任边界
 
 ```text
 Untrusted prompt/model arguments
@@ -75,132 +71,109 @@ Sight MCP process ---- [filesystem boundary] ---- local files
         +---- [stderr boundary] ---- local diagnostics
 ```
 
-stdout is a separate protocol-only boundary. No diagnostic data may cross it.
+stdout 是一条独立的、仅供协议使用的边界。任何诊断数据都不得越过它。
 
-## Assumptions and non-goals
+## 假设与非目标
 
-- The server runs as the same local operating-system user as the MCP host.
-- The operator-controlled environment and provider base URL are trusted configuration inputs.
-- The operator-controlled CLI Provider selection and operating-system user session are trusted.
-- The host model and all tool arguments remain untrusted.
-- The provider may be buggy, compromised, prompt-injected, or return malicious text.
-- v0.1.0 is not a multi-tenant security boundary.
-- Sight MCP cannot protect data from an attacker who already controls the same account, process
-  environment, MCP host, or provider.
-- The server does not execute provider output, fetch URLs from it, or invoke follow-up tools.
+- 服务与 MCP 宿主以同一个本地操作系统用户身份运行。
+- 运营方控制的环境与 Provider 基础 URL 是可信配置输入。
+- 运营方控制的 CLI Provider 选择与操作系统用户会话是可信的。
+- 宿主模型与所有工具参数始终不可信。
+- Provider 可能有缺陷、被攻陷、被 prompt 注入，或返回恶意文本。
+- v0.1.0 不是多租户安全边界。
+- 对于已经控制同一账户、进程环境、MCP 宿主或 Provider 的攻击者，Sight MCP 无法保护数据。
+- 服务不执行 Provider 输出，不从中抓取 URL，也不发起后续工具调用。
 
-## Threats and controls
+## 威胁与控制措施
 
-| ID      | Threat                                                                  | Impact                                          | Required controls                                                                                                                                      | Verification                                                                                |
-| ------- | ----------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| FS-01   | Relative paths or traversal escape intended scope                       | Unrelated file disclosure                       | Require platform-absolute input; canonicalize target and roots; compare by path segments, not string prefix                                            | Unit tests for relative paths, `..`, sibling-prefix collisions, separator and case behavior |
-| FS-02   | Symlink/junction points outside an allowed root                         | Unrelated file disclosure                       | Resolve canonical target before authorization; open resolved target; verify file-handle stat is regular; use no-follow flags where portable            | Symlink/junction escape tests on supported platforms                                        |
-| FS-03   | Target changes between authorization and read                           | Unrelated file read                             | Keep canonicalization, open, stat, and bounded read in one service; prefer no-follow open; document residual same-user TOCTOU limitation               | Race-focused review and best-effort test; residual risk recorded                            |
-| FS-04   | Device, pipe, socket, directory, or special file                        | Blocking, data disclosure, resource exhaustion  | Require regular-file status from opened handle; reject every other kind                                                                                | Fixture tests for directory and available special-file types                                |
-| IMG-01  | Oversized source                                                        | Memory/disk pressure                            | Stat and streaming byte cap; abort if file grows beyond cap                                                                                            | Exact-boundary and growing-stream tests                                                     |
-| IMG-02  | Decompression bomb, extreme dimensions, or oversized normalized payload | CPU/memory/network exhaustion                   | `sharp` decode pixel limit, explicit dimension and transmit-byte limits, bounded formats, concurrency and deadline                                     | Synthetic header fixtures and decoder/encode limit tests                                    |
-| IMG-03  | Misleading extension or polyglot                                        | Parser confusion, bypass                        | Ignore extension for trust; allowlist PNG/JPEG/WebP signatures before native decode; require the decoded format to match                               | Mismatch, malformed, and polyglot fixtures                                                  |
-| IMG-04  | Decoder vulnerability                                                   | Code execution or crash                         | Minimal format set; lockfile; dependency review; security updates; sandboxing documented as future defense-in-depth                                    | SCA, advisories, malformed corpus, release review                                           |
-| IMG-05  | EXIF or ancillary metadata is disclosed                                 | Location/device/privacy leak                    | Normalize orientation, then strip metadata before transmission                                                                                         | Fixture with EXIF/GPS and output metadata inspection                                        |
-| NET-01  | Arbitrary URL or redirect causes SSRF                                   | Internal service/data exposure                  | No URL tool input; validated configured endpoint only; HTTPS remote/HTTP loopback; redirects disabled                                                  | Schema test, URL-policy tests, redirect contract test                                       |
-| NET-02  | Cleartext remote provider                                               | Image/key interception                          | HTTPS required except exact loopback destinations                                                                                                      | URL-policy unit tests                                                                       |
-| NET-03  | Provider returns an unbounded body or stalls                            | Memory/availability                             | Overall deadline, abortable streaming read, response-byte cap, output-char cap                                                                         | Slow/chunked/oversized mock-server tests                                                    |
-| NET-04  | Provider errors leak body, headers, or key                              | Secret/content disclosure                       | Stable sanitized errors; redacting logger; never serialize request/response bodies                                                                     | Snapshot tests with embedded canary secrets                                                 |
-| PRIV-01 | Image is sent remotely without user awareness                           | Privacy breach                                  | Explicit provider configuration and documentation; no automatic fallback or endpoint switching; expose adapter/model in result                         | Documentation review and configuration tests                                                |
-| PRIV-02 | Full local path or prompt appears in results/logs                       | Local/privacy disclosure                        | Result omits path/prompt; logs use request ID and stage only; broad redaction                                                                          | Result and log canary tests                                                                 |
-| AI-01   | Image contains instructions targeting the host model                    | Prompt injection and unsafe follow-up actions   | Tool description, provider system message, and text-result prefix label image/provider text untrusted; server returns data only; never acts on content | Tool/request metadata assertions and adversarial fixture in host smoke test                 |
-| AI-02   | Provider returns malicious instructions or fake metadata                | Prompt injection/integrity loss                 | Validate response shape; metadata is generated locally/configured, not parsed from answer; never execute output                                        | Contract tests with malicious provider text                                                 |
-| COST-01 | Concurrent or repeated calls amplify cost                               | Quota/billing denial                            | Bounded concurrency/queue/retries/deadline; tool not marked idempotent; expose retryability                                                            | Queue, retry, cancellation, and exhaustion tests                                            |
-| COST-02 | 429/5xx retry storm                                                     | Cost/availability                               | Small retry cap, jitter, bounded `Retry-After`, remaining-deadline check                                                                               | Deterministic fake-clock contract tests                                                     |
-| LOG-01  | stdout diagnostics corrupt MCP                                          | Tool failure or injected frames                 | Protocol writes only on stdout; logger permanently bound to stderr                                                                                     | Spawned integration test rejects any non-protocol stdout                                    |
-| CFG-01  | Missing/invalid config falls back unsafely                              | Wrong endpoint or excessive access              | Fail before transport connect; cwd-only root default; no implicit credential/config files                                                              | Startup matrix tests                                                                        |
-| CFG-02  | Debug serialization exposes secrets                                     | Credential leak                                 | Secret wrapper/redaction; prohibit dumping env/config/request objects                                                                                  | Canary-secret tests at every log level                                                      |
-| CRED-01 | Setup places a key in process arguments, shell history, or piped input  | Credential disclosure                           | Invoke absolute `/usr/bin/security` without a shell; require an interactive terminal; use prompt-only `-w` last; never accept a key argument           | Subprocess-argument and non-TTY unit tests                                                  |
-| CRED-02 | A key is paired with the wrong Provider endpoint or model               | Authentication failure or unintended disclosure | Fixed profiles bind endpoint, model, and exact account; read only the selected profile; no automatic fallback                                          | Profile mapping, precedence, and selected-account tests                                     |
-| CRED-03 | Keychain stdout, stderr, timeout, or command failure leaks a credential | Credential disclosure or startup hang           | Exact query; no shell; bounded stdout and duration; discard system stderr; sanitized errors; fail closed                                               | Keychain adapter bounds/error tests and canary-redaction tests                              |
-| CRED-04 | Broad or unintended deletion removes another credential                 | Credential loss                                 | Exact service/account allowlist; one profile per command; interactive confirmation unless `--yes`                                                      | CLI parser and deletion-confirmation tests                                                  |
-| CRED-05 | Missing, locked, or unsupported Keychain causes unsafe fallback         | Wrong credential/Provider use                   | Keychain is used only by explicit profile selection; failure aborts startup; environment precedence is fixed; no second Provider attempt               | Missing/unavailable/command-failure startup tests                                           |
-| CB-01   | Clipboard read without user consent                                     | Unnoticed sensitive-image disclosure            | Require a native confirmation before every read; map rejection to `CLIPBOARD_ACCESS_DENIED`; no silent or cached consent                               | Reader unit tests assert confirmation precedes read and rejection maps correctly            |
-| CB-02   | Temporary file leaks clipboard pixels or persists                       | On-disk sensitive-image exposure                | Stage in a user-private `0700` directory with a random UUID name; read immediately; delete in a `finally` on every exit path                           | Unit tests verify private mode, unique name, and deletion on success/failure/abort          |
-| CB-03   | Oversized or malformed clipboard content exhausts memory or disk        | Resource exhaustion or denial                   | Reuse the `FILE_TOO_LARGE` byte cap; bounded read; no unbounded staging; downstream pipeline revalidates format                                        | Oversize and read-failure tests                                                             |
-| CB-04   | Non-image or spoofed clipboard content escapes validation               | Parser confusion or bypass                      | Read as a stable four-char-code PNG token; treat every non-`OK` status as failure; non-macOS returns `CLIPBOARD_UNAVAILABLE` without a helper          | `NO_IMAGE`, `READ_FAILED`, and non-macOS tests                                              |
-| SUP-01  | Malicious package or Action compromises build                           | Source/release compromise                       | Minimal dependencies; pnpm lockfile; review; third-party Actions pinned to full SHA; read-only default token; dependency and secret scanning           | PR/CI review and release evidence                                                           |
-| SUP-02  | Published tarball differs from reviewed source                          | Consumer compromise                             | CI pack once; inspect contents; bind tarball digest to commit/release; SBOM/provenance as release gate                                                 | Clean-install and digest verification                                                       |
+| ID      | 威胁                                               | 影响                          | 必需控制措施                                                                                                        | 验证方式                                                       |
+| ------- | -------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| FS-01   | 相对路径或路径穿越逃逸出预期范围                   | 无关文件泄露                  | 要求平台绝对路径输入；规范化目标与根目录；按路径分段比较而非字符串前缀                                              | 针对相对路径、`..`、同级前缀冲突、分隔符与大小写行为的单元测试 |
+| FS-02   | 符号链接/junction 指向允许根之外                   | 无关文件泄露                  | 授权前先解析规范化目标；打开解析后的目标；校验文件句柄 stat 为常规文件；在可移植处使用 no-follow 标志               | 在受支持平台上的符号链接/junction 逃逸测试                     |
+| FS-03   | 目标在授权与读取之间发生变化                       | 读取到无关文件                | 把规范化、打开、stat 与有界读取放在同一个服务中；优先使用 no-follow 打开；记录残留的同用户 TOCTOU 限制              | 面向竞态的评审与尽力而为的测试；残留风险已记录                 |
+| FS-04   | 设备、管道、套接字、目录或特殊文件                 | 阻塞、数据泄露、资源耗尽      | 要求已打开句柄的状态为常规文件；拒绝其它一切类型                                                                    | 针对目录与可用特殊文件类型的夹具测试                           |
+| IMG-01  | 超大源文件                                         | 内存/磁盘压力                 | stat 与流式字节上限；文件在读取中增长超限时中止                                                                     | 精确边界与增长流测试                                           |
+| IMG-02  | 解压炸弹、极端尺寸或超大归一化载荷                 | CPU/内存/网络耗尽             | `sharp` 解码像素上限、显式尺寸与传输字节上限、有界格式集、并发与截止时间                                            | 合成头部夹具与解码/编码上限测试                                |
+| IMG-03  | 误导性扩展名或多态文件                             | 解析器混淆、绕过              | 信任判断上忽略扩展名；原生解码前先按 PNG/JPEG/WebP 签名白名单校验；要求解码后的格式一致                             | 不匹配、畸形与多态文件夹具                                     |
+| IMG-04  | 解码器漏洞                                         | 代码执行或崩溃                | 最小格式集；锁文件；依赖审查；安全更新；沙箱作为未来的纵深防御记录在案                                              | SCA、安全公告、畸形语料库、发布评审                            |
+| IMG-05  | EXIF 或附属元数据被泄露                            | 位置/设备/隐私泄露            | 先归一化方向，再在传输前剥离元数据                                                                                  | 含 EXIF/GPS 的夹具与输出元数据检查                             |
+| NET-01  | 任意 URL 或重定向导致 SSRF                         | 内部服务/数据暴露             | 工具不接受 URL 输入；仅使用经过校验的配置端点；远程 HTTPS/回环 HTTP；禁用重定向                                     | schema 测试、URL 策略测试、重定向契约测试                      |
+| NET-02  | 明文远程 Provider                                  | 图像/密钥被截获               | 除精确回环目的地外一律要求 HTTPS                                                                                    | URL 策略单元测试                                               |
+| NET-03  | Provider 返回无界响应体或长时间挂起                | 内存/可用性                   | 整体截止时间、可中止的流式读取、响应字节上限、输出字符上限                                                          | 慢速/分块/超大响应的模拟服务测试                               |
+| NET-04  | Provider 错误泄露响应体、请求头或密钥              | 密钥/内容泄露                 | 稳定的脱敏错误；脱敏日志器；绝不序列化请求/响应体                                                                   | 内嵌 canary 密钥的快照测试                                     |
+| PRIV-01 | 图片在用户不知情的情况下被远程发送                 | 隐私侵害                      | 显式的 Provider 配置与文档；无自动回退或端点切换；在结果中暴露适配器/模型                                           | 文档评审与配置测试                                             |
+| PRIV-02 | 完整本地路径或 prompt 出现在结果/日志中            | 本地/隐私泄露                 | 结果中不含路径/prompt；日志只使用请求 ID 与阶段；广泛脱敏                                                           | 结果与日志的 canary 测试                                       |
+| AI-01   | 图片中包含针对宿主模型的指令                       | prompt 注入与不安全的后续动作 | 工具描述、Provider system 消息与文本结果前缀均标注图像/Provider 文本不可信；服务只返回数据；绝不依据内容行动        | 工具/请求元数据断言与宿主冒烟测试中的对抗性夹具                |
+| AI-02   | Provider 返回恶意指令或伪造元数据                  | prompt 注入/完整性受损        | 校验响应结构；元数据由本地生成或来自配置，而非从答案中解析；绝不执行输出                                            | 使用恶意 Provider 文本的契约测试                               |
+| COST-01 | 并发或重复调用放大费用                             | 配额/计费拒绝服务             | 有界的并发/队列/重试/截止时间；工具不标记为幂等；暴露可重试性                                                       | 队列、重试、取消与耗尽测试                                     |
+| COST-02 | 429/5xx 重试风暴                                   | 费用/可用性                   | 较小的重试上限、抖动、有界的 `Retry-After`、剩余截止时间检查                                                        | 使用确定性假时钟的契约测试                                     |
+| LOG-01  | stdout 诊断信息破坏 MCP                            | 工具失败或帧被注入            | stdout 只写协议内容；日志器永久绑定到 stderr                                                                        | 派生进程集成测试拒绝任何非协议 stdout                          |
+| CFG-01  | 缺失/非法配置发生不安全回退                        | 错误端点或过度访问            | 在连接传输之前失败；默认根目录仅为 cwd；无隐式凭据/配置文件                                                         | 启动矩阵测试                                                   |
+| CFG-02  | 调试序列化暴露密钥                                 | 凭据泄露                      | 密钥包装类型/脱敏；禁止导出 env/config/请求对象                                                                     | 各日志级别下的 canary 密钥测试                                 |
+| CRED-01 | 配置过程把密钥放进进程参数、shell 历史或管道输入   | 凭据泄露                      | 不经 shell 调用绝对路径 `/usr/bin/security`；要求交互式终端；把仅提示用的 `-w` 放在最后；绝不接受密钥参数           | 子进程参数与非 TTY 单元测试                                    |
+| CRED-02 | 密钥与错误的 Provider 端点或模型配对               | 认证失败或非预期泄露          | 固定 profile 绑定端点、模型与精确账户；只读取所选 profile；无自动回退                                               | profile 映射、优先级与所选账户测试                             |
+| CRED-03 | Keychain 的 stdout、stderr、超时或命令失败泄露凭据 | 凭据泄露或启动挂起            | 精确查询；不经 shell；有界 stdout 与时长；丢弃系统 stderr；脱敏错误；失败即关闭                                     | Keychain 适配器边界/错误测试与 canary 脱敏测试                 |
+| CRED-04 | 过宽或非预期的删除移除了其它凭据                   | 凭据丢失                      | 精确的 service/account 白名单；每条命令只针对一个 profile；除非 `--yes` 否则交互确认                                | CLI 解析器与删除确认测试                                       |
+| CRED-05 | Keychain 缺失、锁定或不受支持导致不安全回退        | 使用了错误的凭据/Provider     | Keychain 仅在显式选择 profile 时使用；失败即中止启动；环境变量优先级固定；不尝试第二个 Provider                     | 缺失/不可用/命令失败的启动测试                                 |
+| CB-01   | 未经用户同意读取剪切板                             | 敏感图像在无察觉下泄露        | 每次读取前都要求原生确认；拒绝映射为 `CLIPBOARD_ACCESS_DENIED`；无静默或缓存同意                                    | 读取器单元测试断言确认先于读取，且拒绝映射正确                 |
+| CB-02   | 临时文件泄露剪切板像素或长期残留                   | 敏感图像落盘暴露              | 暂存于用户私有的 `0700` 目录并使用随机 UUID 文件名；立即读取；在每条退出路径的 `finally` 中删除                     | 单元测试验证私有权限、唯一文件名，以及成功/失败/中止时的删除   |
+| CB-03   | 超大或畸形剪切板内容耗尽内存或磁盘                 | 资源耗尽或拒绝服务            | 复用 `FILE_TOO_LARGE` 字节上限；有界读取；不做无界暂存；下游流水线重新校验格式                                      | 超大与读取失败测试                                             |
+| CB-04   | 非图像或伪造的剪切板内容绕过校验                   | 解析器混淆或绕过              | 以稳定的四字符码 PNG token 读取；把所有非 `OK` 状态视为失败；非 macOS 返回 `CLIPBOARD_UNAVAILABLE` 且不启动辅助程序 | `NO_IMAGE`、`READ_FAILED` 与非 macOS 测试                      |
+| SUP-01  | 恶意包或 Action 破坏构建                           | 源码/发布被攻陷               | 最小依赖；pnpm 锁文件；评审；第三方 Actions 固定到完整 SHA；默认只读 token；依赖与密钥扫描                          | PR/CI 评审与发布证据                                           |
+| SUP-02  | 发布的 tarball 与已评审源码不一致                  | 使用者被攻陷                  | CI 只打包一次；检查包内容；把 tarball 摘要绑定到 commit/release；SBOM/provenance 作为发布门禁                       | 干净安装与摘要校验                                             |
 
-## Data flow and retention
+## 数据流与留存
 
-1. `analyze_image` reads the authorized file into bounded process memory.
-2. `analyze_clipboard_image` shows a native confirmation, then stages the clipboard image as a
-   random-named PNG in the user-private `~/Library/Caches/Sight MCP/inbox` directory (mode `0700`),
-   reads it into bounded memory, and deletes the temporary file in every exit path.
-3. A normalized image is produced in memory. File input creates no temporary file; clipboard input
-   creates only the transient staging file described above, which is removed even on failure, limit
-   rejection, or cancellation.
-4. The normalized bytes are encoded for one provider request.
-5. Source and normalized buffers become unreachable after request completion/cancellation and are
-   not cached.
-6. The server writes no prompt, answer, image, or usage history to disk.
-7. Provider-side retention is outside Sight MCP's control and must be assessed by the user when
-   choosing a remote endpoint.
-8. With a built-in profile, the selected API key is requested from the exact Keychain service and
-   account, held in bounded process memory, wrapped by the same redacted secret type, and used only
-   for that Provider request. Sight MCP does not cache it on disk.
+1. `analyze_image` 把已授权文件读入有界的进程内存。
+2. `analyze_clipboard_image` 先展示原生确认，随后把剪切板图片以随机文件名的 PNG 暂存到用户私有的
+   `~/Library/Caches/Sight MCP/inbox` 目录（权限
+   `0700`），读入有界内存，并在每条退出路径中删除该临时文件。
+3. 在内存中生成归一化后的图像。文件输入不产生任何临时文件；剪切板输入只产生上述瞬时暂存文件，且即使在失败、超限拒绝或取消时也会被删除。
+4. 归一化后的字节被编码进一次 Provider 请求。
+5. 源缓冲区与归一化缓冲区在请求完成/取消后即不可达，且不被缓存。
+6. 服务不会把任何 prompt、答案、图像或使用历史写入磁盘。
+7. Provider 侧的留存不在 Sight MCP 控制范围内，用户在选择远程端点时必须自行评估。
+8. 使用内置 profile 时，所选 API 密钥从精确的 Keychain
+   service 与 account 请求，保存在有界的进程内存中，由同一套脱敏密钥类型包装，且仅用于该 Provider 请求。Sight
+   MCP 不会把它缓存到磁盘。
 
-JavaScript cannot guarantee immediate zeroization of all copies. The design minimizes lifetime and
-duplication but does not claim secure erasure from managed memory.
+JavaScript 无法保证所有副本被立即清零。本设计尽量缩短密钥生命周期并减少复制，但不宣称能从托管内存中安全擦除。
 
-## Privacy disclosure requirements
+## 隐私披露要求
 
-User documentation must state:
+用户文档必须说明：
 
-- whether the configured endpoint is local or remote;
-- that remote analysis transmits normalized image pixels and the prompt;
-- that metadata is removed but visible content remains sensitive;
-- that provider retention, training, jurisdiction, and access policy are provider responsibilities;
-- that allowed roots grant read eligibility, not automatic upload of every file in the root;
-- that each actual upload still occurs only when the host calls the tool;
-- that `analyze_clipboard_image` reads the current clipboard only after an explicit per-call
-  confirmation, may transmit that image's visible pixels to the configured (possibly remote)
-  provider, and briefly stages it in a private temporary file that is deleted after the call.
+- 所配置的端点是本地还是远程；
+- 远程分析会传输归一化后的图像像素与 prompt；
+- 元数据已被移除，但可见内容仍然敏感；
+- Provider 的留存、训练、司法辖区与访问策略属于 Provider 的责任；
+- 允许根目录授予的是「可被读取的资格」，而非自动上传根目录下的每个文件；
+- 每次实际上传仍然只在宿主调用工具时才发生；
+- `analyze_clipboard_image`
+  只在每次调用显式确认之后才读取当前剪切板，可能把该图片的可见像素传输给所配置的（可能是远程的）Provider，并会短暂地把它暂存在一个私有临时文件中，调用结束后即删除。
 
-## Security gates for implementation PRs
+## 实现类 PR 的安全门禁
 
-- FS/image work requires a high-risk label, threat-model review, and security regression tests.
-- Provider work requires a high-risk label, credential/redaction tests, destination-policy tests,
-  and no live secrets.
-- Credential-store work requires subprocess argument review, exact service/account tests,
-  non-interactive failure tests, deletion safeguards, and a synthetic canary check that is removed
-  after validation.
-- Tool integration requires adversarial prompt-injection wording and stdout-integrity tests.
-- Workflow/release changes require least-privilege review and full-SHA pins for third-party Actions.
-- A known critical decoder or runtime vulnerability blocks release unless a separately approved,
-  expiring exception documents non-exploitability and compensation.
+- 文件系统/图像相关工作需要高风险标签、威胁模型评审与安全回归测试。
+- Provider 相关工作需要高风险标签、凭据/脱敏测试、目的地策略测试，且不得使用真实密钥。
+- 凭据存储相关工作需要子进程参数评审、精确 service/account 测试、非交互失败测试、删除保护措施，以及一个在验证后即移除的合成 canary 检查。
+- 工具集成需要对抗性 prompt 注入措辞与 stdout 完整性测试。
+- 工作流/发布变更需要最小权限评审，且第三方 Actions 必须固定到完整 SHA。
+- 已知的严重解码器或运行时漏洞会阻断发布，除非有单独批准且带过期时间的例外，说明其不可利用性与补偿措施。
 
-## Residual risks
+## 残留风险
 
-- Same-user filesystem races cannot be fully eliminated portably in Node.js; scope is reduced by
-  canonicalization, opened-handle validation, bounded read, and a local single-user deployment
-  assumption.
-- Native image decoding remains a memory-safety and availability risk despite format and resource
-  limits.
-- Sharp/libvips work cannot be interrupted safely in the middle of one native operation. Abort
-  signals are checked before and after metadata/decode/encode stages, so cancellation bounds later
-  work but cannot reclaim an already-running native stage immediately.
-- Provider output can still influence a host model. Sight MCP can label and structure data but
-  cannot enforce the host's later behavior.
-- Remote provider policy and retention cannot be technically enforced by Sight MCP.
-- macOS Keychain reduces plaintext exposure but is not a boundary against a process that already
-  controls the same user account or can obtain access through that user's Keychain policy.
-- A stored key is briefly present in managed Node.js memory during profile startup and cannot be
-  guaranteed to be immediately zeroized.
-- An operator can intentionally configure an overly broad allowed root or a remote provider;
-  warnings cannot replace operator judgment.
+- 同用户下的文件系统竞态在 Node.js 中无法以可移植方式完全消除；通过规范化、已打开句柄校验、有界读取以及本地单用户部署假设来缩小范围。
+- 尽管有格式与资源限制，原生图像解码仍然存在内存安全与可用性风险。
+- Sharp/libvips 在单次原生操作进行到一半时无法被安全中断。中止信号在元数据/解码/编码各阶段前后被检查，因此取消可以限制后续工作，但无法立即回收已在运行的原生阶段。
+- Provider 输出仍可能影响宿主模型。Sight MCP 能够标注并结构化数据，但无法强制约束宿主后续的行为。
+- 远程 Provider 的策略与留存无法由 Sight MCP 在技术上强制执行。
+- macOS
+  Keychain 减少了明文暴露，但对于已经控制同一用户账户、或能借由该用户 Keychain 策略获得访问权的进程而言，它不构成边界。
+- 已存储的密钥在 profile 启动期间会短暂存在于托管的 Node.js 内存中，无法保证被立即清零。
+- 运营方可以有意配置过宽的允许根目录或远程 Provider；警告无法替代运营方的判断。
 
-## Review triggers
+## 评审触发条件
 
-Update or supersede this threat model before adding URL/base64 input, archives, SVG/PDF/video,
-server-side capture, caches, persistent logs, telemetry, multiple providers, automatic failover,
-Streamable HTTP, authentication, remote hosting, multi-tenant use, another operating-system
-credential backend, a non-macOS clipboard backend, OS-native screenshot or server-side capture, a
-persistent clipboard cache, silent or consent-cached clipboard reads, or a change to
-profile/credential precedence.
+在新增以下内容之前，必须更新或以新文档取代本威胁模型：URL/base64 输入、压缩包、SVG/PDF/视频、服务端截屏、缓存、持久化日志、遥测、多 Provider、自动故障转移、Streamable
+HTTP、认证、远程托管、多租户使用、另一种操作系统凭据后端、非 macOS 剪切板后端、系统原生截屏或服务端捕获、持久化剪切板缓存、静默或缓存同意的剪切板读取，以及对 profile/凭据优先级的更改。

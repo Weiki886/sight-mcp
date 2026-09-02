@@ -330,7 +330,7 @@ Provider-failure/cancellation scenarios, and generates a CycloneDX SBOM with `np
 those files as one artifact; a `main` run also creates GitHub build provenance for the exact `.tgz`.
 
 Additional release evidence and the manual Host matrix are documented in
-[the v0.1.0 release runbook](docs/release/process.md). Formal npm publish, Git tag, and GitHub
+[the v0.1.0 release runbook](docs/release/process.en.md). Formal npm publish, Git tag, and GitHub
 Release remain separate human-approved steps.
 
 ## Contributing
@@ -340,16 +340,16 @@ scope and design can be agreed on before code.
 
 ## Design documents
 
-- [v0.1.0 proposal and full specification](docs/proposals/0001-sight-mcp-v0.1.0.md)
-- [Runtime and architecture ADR](docs/adr/0001-runtime-and-architecture.md)
-- [macOS Keychain and Provider profiles ADR](docs/adr/0002-macos-keychain-provider-profiles.md)
-- [One-click clipboard image reading ADR](docs/adr/0003-clipboard-image-reading.md)
-- [Vision tool and Provider contract](docs/specs/vision-tool-contract.md)
-- [Configuration specification](docs/specs/configuration.md)
-- [Threat model](docs/security/threat-model.md)
-- [OpenAI-compatible Provider](docs/providers/openai-compatible.md)
-- [Test and delivery strategy](docs/testing/strategy.md)
-- [v0.1.0 release notes](docs/release/v0.1.0.md)
+- [v0.1.0 proposal and full specification](docs/proposals/0001-sight-mcp-v0.1.0.en.md)
+- [Runtime and architecture ADR](docs/adr/0001-runtime-and-architecture.en.md)
+- [macOS Keychain and Provider profiles ADR](docs/adr/0002-macos-keychain-provider-profiles.en.md)
+- [One-click clipboard image reading ADR](docs/adr/0003-clipboard-image-reading.en.md)
+- [Vision tool and Provider contract](docs/specs/vision-tool-contract.en.md)
+- [Configuration specification](docs/specs/configuration.en.md)
+- [Threat model](docs/security/threat-model.en.md)
+- [OpenAI-compatible Provider](docs/providers/openai-compatible.en.md)
+- [Test and delivery strategy](docs/testing/strategy.en.md)
+- [v0.1.0 release notes](docs/release/v0.1.0.en.md)
 
 ## License
 
