@@ -12,7 +12,7 @@ MCP 宿主增加图像识别能力——同时不会把无限制的文件读取�
 [![Node.js](https://img.shields.io/node/v/@weiki/sight-mcp)](https://nodejs.org/)
 [![CI](https://github.com/Weiki886/sight-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Weiki886/sight-mcp/actions/workflows/ci.yml)
 
-**语言 / Language：** [中文](README.md) · [English](README.en.md)
+**语言 / Language：** 中文 · [English](README.en.md)
 
 **目录：** [快速开始](#快速开始) · [特性](#特性) · [安装](#安装) · [模型配置](#模型配置) ·
 [Claude Code](#claude-code-配置) · [Codex](#codex-配置) · [工具](#工具) · [配置项](#配置项) ·
