@@ -12,7 +12,7 @@ unrestricted file reader.
 [![Node.js](https://img.shields.io/node/v/@weiki/sight-mcp)](https://nodejs.org/)
 [![CI](https://github.com/Weiki886/sight-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Weiki886/sight-mcp/actions/workflows/ci.yml)
 
-**语言 / Language：** [中文](README.md) · [English](README.en.md)
+**语言 / Language：** [中文](README.md) · English
 
 **Contents:** [Quick Start](#quick-start) · [Features](#features) · [Installation](#installation) ·
 [Provider Setup](#provider-setup) · [Claude Code](#claude-code-configuration) ·

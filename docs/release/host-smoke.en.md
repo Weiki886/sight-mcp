@@ -1,6 +1,6 @@
 # Claude Code and Codex Host smoke
 
-**语言 / Language：** [中文](host-smoke.en.md) · English
+**语言 / Language：** [中文](host-smoke.md) · English
 
 - Scope: v0.1.0 release candidate
 - Inputs: one candidate `.tgz`, synthetic fixtures, local synthetic OpenAI-compatible endpoint
