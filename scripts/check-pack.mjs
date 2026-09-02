@@ -35,7 +35,12 @@ async function verifyArchive(archivePath) {
   const rootPackageJson = JSON.parse(await readFile(join(projectRoot, "package.json"), "utf8"));
   const { stdout: listing } = await execFileAsync("tar", ["-tzf", archivePath]);
   const entries = listing.trim().split("\n");
-  const allowedTopLevel = new Set(["package/LICENSE", "package/README.md", "package/package.json"]);
+  const allowedTopLevel = new Set([
+    "package/LICENSE",
+    "package/README.md",
+    "package/README.en.md",
+    "package/package.json",
+  ]);
   const forbiddenEntries = entries.filter(
     (entry) => !allowedTopLevel.has(entry) && !entry.startsWith("package/dist/"),
   );
@@ -127,6 +132,7 @@ async function verifyArchive(archivePath) {
   const textEntries = entries.filter(
     (entry) =>
       entry === "package/README.md" ||
+      entry === "package/README.en.md" ||
       entry === "package/package.json" ||
       /\.(?:js|d\.ts|map)$/u.test(entry),
   );
