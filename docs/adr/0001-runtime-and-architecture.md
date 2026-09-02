@@ -1,58 +1,51 @@
-# ADR 0001: TypeScript runtime and provider-neutral stdio architecture
+# ADR 0001：TypeScript 运行时与 Provider 中立的 stdio 架构
 
-- Status: Accepted
-- Accepted: 2026-08-28
-- Date: 2026-08-28
-- Amended: 2026-09-01; credential-source details are superseded by
-  [ADR 0002](0002-macos-keychain-provider-profiles.md)
-- Deciders: Weiki886
-- Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.md),
+**语言 / Language：** 中文 · [English](0001-runtime-and-architecture.en.md)
+
+- 状态：已接受
+- 接受日期：2026-08-28
+- 日期：2026-08-28
+- 修订：2026-09-01；凭据来源的相关细节已由 [ADR 0002](0002-macos-keychain-provider-profiles.md) 取代
+- 决策者：Weiki886
+- 相关：[提案 0001](../proposals/0001-sight-mcp-v0.1.0.md)、
   [Issue #1](https://github.com/Weiki886/sight-mcp/issues/1)
 
-## Context
+## 背景
 
-Sight MCP must let a text-only model in Claude Code or Codex ask a separate vision model about a
-local image. The first release needs predictable installation, current MCP support, strict external
-contracts, safe image preprocessing, and a provider boundary that can evolve without changing the
-MCP tool.
+Sight MCP 需要让 Claude
+Code 或 Codex 中的纯文本模型，就一张本地图片向另一个视觉模型提问。首个版本需要具备可预期的安装方式、对当前 MCP 协议的支持、严格的对外契约、安全的图像预处理，以及一条能够独立演进而不影响 MCP 工具的 Provider 边界。
 
-The implementation is primarily an MCP lifecycle, filesystem policy, image preprocessing, and HTTP
-orchestration problem. It is not a model-training or local-inference runtime.
+这个实现本质上是 MCP 生命周期、文件系统策略、图像预处理与 HTTP 编排的问题，而不是模型训练或本地推理运行时。
 
-## Decision
+## 决策
 
-### Runtime and language
+### 运行时与语言
 
-Use TypeScript in strict mode, ESM modules, pnpm, and supported Node.js LTS releases. The package
-will declare and test an explicit Node engine floor rather than silently depending on whichever
-runtime happens to be installed.
+使用严格模式的 TypeScript、ESM 模块、pnpm，以及受支持的 Node.js
+LTS 版本。包会显式声明并测试 Node 引擎版本下限，而不是默默依赖恰好装在机器上的那个运行时。
 
-Use the official MCP TypeScript SDK v2 server package. Do not use the v1 compatibility package in a
-new project.
+使用官方 MCP TypeScript SDK v2 的 server 包。新项目不使用 v1 兼容包。
 
-Use Zod v4 at external boundaries and derive TypeScript types from schemas when practical. Do not
-maintain hand-written runtime schemas and separate, potentially divergent TypeScript interfaces for
-the same public payload.
+在外部边界使用 Zod
+v4，并在可行时从 schema 推导 TypeScript 类型。不为同一份公开载荷同时维护手写的运行时 schema 和另一套可能与之偏离的 TypeScript 接口。
 
-### Transport
+### 传输层
 
-Use stdio as the only v0.1.0 server transport. stdout is reserved for MCP frames; diagnostics are
-written to stderr through a redacting logger.
+v0.1.0 仅使用 stdio 作为服务端传输。stdout 专供 MCP 帧使用；诊断信息通过脱敏日志器写入 stderr。
 
-Keep transport construction separate from application composition so a future Streamable HTTP
-adapter can reuse the application without importing stdio details into domain modules.
+将传输层构造与应用装配分离，使未来的 Streamable
+HTTP 适配器可以复用应用层，而不会把 stdio 细节带进领域模块。
 
-### Public MCP surface
+### 对外 MCP 接口
 
-Expose one tool, `analyze_image`. Use closed Zod input and output schemas, an object-shaped
-versioned structured result, and a text fallback.
+暴露一个工具
+`analyze_image`。使用封闭的 Zod 输入与输出 schema、对象形态的带版本结构化结果，以及文本回退。
 
-Mark the tool as read-only and non-destructive, but not idempotent because repeated calls can create
-provider cost. Mark it as open-world because it communicates with a separately operated provider.
+将该工具标记为只读、非破坏性，但**不**标记为幂等，因为重复调用会产生 Provider 费用。标记为 open-world，因为它需要与独立运营的 Provider 通信。
 
-### Internal boundaries
+### 内部边界
 
-Use the following inward dependency direction:
+采用如下自外向内的依赖方向：
 
 ```text
 stdio entrypoint
@@ -63,87 +56,70 @@ stdio entrypoint
       -> VisionProvider port
 ```
 
-Infrastructure modules implement ports. Domain and application modules do not import MCP, `sharp`,
-provider SDK, or Node transport types. Cross-boundary image bytes use `Uint8Array`; cancellation
-uses the platform `AbortSignal`.
+基础设施模块实现各个 port。领域层与应用层模块不导入 MCP、`sharp`、Provider
+SDK 或 Node 传输类型。跨边界传递的图像字节使用 `Uint8Array`；取消操作使用平台原生的 `AbortSignal`。
 
-### Provider strategy
+### Provider 策略
 
-Define a provider-neutral `VisionProvider` interface and implement one OpenAI-compatible
-`/chat/completions` adapter. Use platform HTTP primitives unless an SDK demonstrates necessary
-compatibility or security value that cannot be achieved clearly without it.
+定义 Provider 中立的 `VisionProvider` 接口，并实现一个 OpenAI 兼容的 `/chat/completions`
+适配器。优先使用平台 HTTP 原语，除非某个 SDK 能带来无法以清晰方式自行实现的兼容性或安全价值。
 
-Provider selection happens once at startup. The MCP call cannot choose an endpoint, model, API key,
-or arbitrary header.
+Provider 的选择只在启动时发生一次。MCP 调用无法选择端点、模型、API 密钥或任意请求头。
 
-### Configuration
+### 配置
 
-Use validated environment variables plus documented safe defaults in v0.1.0. Do not load credentials
-implicitly from the repository or current directory. An explicit built-in Provider profile may use
-the operating-system credential source defined by ADR 0002. Invalid required configuration fails
-startup with redacted diagnostics.
+v0.1.0 使用经过校验的环境变量，加上有文档记录的安全默认值。不从仓库或当前目录隐式加载凭据。显式指定的内置 Provider
+profile 可以使用 ADR 0002 定义的操作系统凭据源。必填配置非法时，启动失败并输出脱敏诊断。
 
-### Image processing
+### 图像处理
 
-Use `sharp` behind an `ImagePipeline` interface. Authorize and byte-limit the source before
-decoding; then limit decoded pixels and dimensions, normalize orientation, remove metadata, resize
-without enlargement, and encode a bounded provider payload.
+在 `ImagePipeline` 接口之后使用
+`sharp`。解码前先完成授权与字节数限制；随后限制解码后的像素与尺寸、归一化方向、移除元数据、只缩小不放大，并编码出有界的 Provider 载荷。
 
-## Consequences
+## 影响
 
-### Positive
+### 正面
 
-- The official SDK tracks the current protocol and provides stdio and output-schema support.
-- npm/`npx` distribution matches how coding hosts commonly launch local MCP servers.
-- TypeScript and Zod make tool, configuration, provider, and error contracts reviewable at compile
-  time and runtime.
-- Provider adapters can be added without renaming the public tool.
-- Transport, image, provider, and MCP details can be tested independently.
-- The first release has a small public surface and a clear privacy boundary.
+- 官方 SDK 紧跟当前协议，并提供 stdio 与 output schema 支持。
+- npm/`npx` 分发方式契合编码类宿主启动本地 MCP 服务的通行做法。
+- TypeScript 与 Zod 让工具、配置、Provider 与错误契约在编译期和运行时都可审查。
+- 新增 Provider 适配器无需重命名对外工具。
+- 传输、图像、Provider 与 MCP 细节可以独立测试。
+- 首个版本对外接口很小，隐私边界清晰。
 
-### Negative
+### 负面
 
-- Node and a package install are required; v0.1.0 is not a single native executable.
-- `sharp` introduces a native dependency and supply-chain/packaging work across supported platforms.
-- Generic environment-only configuration can be verbose in host configuration files; ADR 0002 adds
-  an explicit macOS Keychain path for built-in profiles.
-- OpenAI-compatible implementations vary in response details; the adapter must reject unsupported
-  shapes instead of accumulating silent heuristics.
-- stdio does not serve shared or remote clients.
+- 需要 Node 与一次包安装；v0.1.0 不是单个原生可执行文件。
+- `sharp` 引入原生依赖，并在各受支持平台上带来供应链与打包工作。
+- 通用的「纯环境变量」配置在宿主配置文件里会比较冗长；ADR 0002 为内置 profile 补充了显式的 macOS
+  Keychain 路径。
+- 各家 OpenAI 兼容实现在响应细节上存在差异；适配器必须拒绝不受支持的形态，而不是不断堆积隐式启发式规则。
+- stdio 无法服务共享或远程客户端。
 
-### Risks
+### 风险
 
-- New MCP v2 behavior may expose compatibility differences in older hosts. The object-shaped result
-  and text fallback reduce this risk.
-- Provider compatibility can tempt vendor-specific fields to leak into domain types. Contract tests
-  and an adapter boundary prevent this.
-- A native decoder expands attack surface. Strict limits, dependency review, minimal formats,
-  fixtures, and timely upgrades are required.
+- MCP v2 的新行为可能在较旧宿主上暴露兼容性差异。对象形态结果与文本回退降低了这一风险。
+- Provider 兼容性容易诱使厂商特有字段渗入领域类型。契约测试与适配器边界可以防止这一点。
+- 原生解码器扩大了攻击面。必须配合严格限制、依赖审查、最小格式集、测试夹具与及时升级。
 
-## Rejected alternatives
+## 已否决的备选方案
 
-- Python core: best reserved for future OCR, OpenCV, or local-model capabilities that justify a
-  separate runtime.
-- Plain JavaScript: insufficient compile-time protection for the number of public and
-  security-sensitive boundaries.
-- Go/Rust core: useful for a measured binary/startup requirement, but slower for the first
-  MCP-compatible release.
-- MCP SDK v1: legacy line; inappropriate for a new project targeting the current protocol.
-- Direct provider calls in the tool handler: couples protocol code to vendor and makes deterministic
-  tests harder.
-- Multiple tools in v0.1.0: expands schemas and model selection behavior before the core bridge is
-  validated.
-- HTTP-first: adds a materially larger authentication, authorization, networking, and operations
-  scope.
+- Python 核心：更适合留给未来 OCR、OpenCV 或本地模型等确实需要独立运行时的能力。
+- 纯 JavaScript：面对数量众多的公开与安全敏感边界，编译期保护不足。
+- Go/Rust 核心：在有明确二进制体积/启动时间要求时有价值，但对首个 MCP 兼容版本而言推进更慢。
+- MCP SDK v1：属于遗留线，不适合面向当前协议的新项目。
+- 在工具处理函数里直接调用 Provider：会把协议代码与厂商耦合，也让确定性测试更困难。
+- v0.1.0 提供多个工具：在核心桥接尚未验证前就扩大了 schema 与模型选择行为。
+- HTTP 优先：显著扩大认证、授权、网络与运维范围。
 
-## Compliance
+## 合规检查
 
-Implementation PRs conform to this ADR when:
+实现类 PR 满足以下条件时即符合本 ADR：
 
-- dependency direction matches the documented ports;
-- no business logic or provider translation resides in the stdio entrypoint;
-- no provider type appears in the MCP input or output;
-- stdout contains only protocol traffic;
-- all external inputs and outputs are runtime validated;
-- provider and image implementations are replaceable in tests;
-- deviations are recorded in a superseding ADR before merge.
+- 依赖方向与文档记录的 ports 一致；
+- stdio 入口中不存在业务逻辑或 Provider 转换；
+- MCP 输入或输出中不出现任何 Provider 类型；
+- stdout 只包含协议流量；
+- 所有外部输入与输出都经过运行时校验；
+- Provider 与图像实现在测试中可替换；
+- 任何偏离都在合并前记录到一份取代性 ADR 中。

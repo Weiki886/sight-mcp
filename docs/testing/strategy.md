@@ -1,213 +1,187 @@
-# Test and delivery strategy
+# 测试与交付策略
 
-- Status: Accepted
-- Accepted: 2026-08-28
-- Amended: 2026-09-01 by Issue #16 (Keychain profiles) and clipboard image input
-- Scope: v0.1.0
-- Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.md),
-  [threat model](../security/threat-model.md)
+**语言 / Language：** 中文 · [English](strategy.en.md)
 
-## Objectives
+- 状态：已接受
+- 接受日期：2026-08-28
+- 修订：2026-09-01，依据 Issue #16（Keychain profiles）与剪切板图像输入
+- 范围：v0.1.0
+- 相关：[提案 0001](../proposals/0001-sight-mcp-v0.1.0.md)、 [威胁模型](../security/threat-model.md)
 
-Tests must prove the vision bridge is contract-compatible, bounded, private by default,
-deterministic without paid services, installable from its published artifact, and usable from both
-target hosts.
+## 目标
 
-The normal test suite never calls a live provider and never requires a real credential.
+测试必须证明：这座视觉桥接在契约上兼容、资源有界、默认保护隐私、无需付费服务即可确定性运行、可从其发布制品安装，并且在两个目标宿主中都能实际使用。
 
-## Test layers
+常规测试套件从不调用真实 Provider，也从不需要真实凭据。
 
-| Layer               | Scope                                                                                                        | Representative evidence                                     | PR gate                                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------- |
-| Unit                | schemas, config, paths, redaction, image policy, error mapping, retry decisions                              | deterministic Vitest results                                | required                                      |
-| Provider contract   | HTTP request shape, response parsing, status mapping, deadlines, redirects, body bounds                      | local mock HTTP server and fake clock                       | required for provider changes                 |
-| MCP integration     | initialize, tools/list, tools/call, structured/text output, errors, cancellation, shutdown, stdout integrity | spawned stdio client using official MCP client package      | required for tool/transport changes           |
-| Packaging           | packed-file allowlist, CLI executable, clean install, license, startup failure/success                       | `pnpm pack` tarball installed into a temporary directory    | required before release and packaging changes |
-| Host compatibility  | documented Claude Code and Codex setup with the same fixtures                                                | manual smoke-test record with versions and sanitized output | required before release                       |
-| Security regression | threat IDs from the threat model                                                                             | dedicated test names linked to threat IDs                   | required for affected boundary                |
+## 测试分层
 
-## Fixture policy
+| 层次          | 范围                                                                                 | 代表性证据                                | PR 门禁                |
+| ------------- | ------------------------------------------------------------------------------------ | ----------------------------------------- | ---------------------- |
+| 单元          | schema、配置、路径、脱敏、图像策略、错误映射、重试决策                               | 确定性的 Vitest 结果                      | 必需                   |
+| Provider 契约 | HTTP 请求结构、响应解析、状态映射、截止时间、重定向、响应体边界                      | 本地模拟 HTTP 服务与假时钟                | Provider 变更时必需    |
+| MCP 集成      | initialize、tools/list、tools/call、结构化/文本输出、错误、取消、关闭、stdout 完整性 | 使用官方 MCP 客户端包派生 stdio 客户端    | 工具/传输层变更时必需  |
+| 打包          | 打包文件白名单、CLI 可执行性、干净安装、许可证、启动失败/成功                        | `pnpm pack` 产出的 tarball 安装到临时目录 | 发布前与打包变更前必需 |
+| 宿主兼容性    | 按文档配置的 Claude Code 与 Codex，使用相同夹具                                      | 含版本号与脱敏输出的手工冒烟测试记录      | 发布前必需             |
+| 安全回归      | 来自威胁模型的威胁 ID                                                                | 与威胁 ID 关联的专用测试名称              | 受影响边界变更时必需   |
 
-- Commit only synthetic, public-domain, or project-created fixtures with no personal or confidential
-  data.
-- Keep source fixtures small. Generate large-byte or extreme-dimension streams in tests without
-  committing huge binaries.
-- Include PNG, JPEG, WebP, alpha, orientation metadata, malformed data, misleading extension,
-  unsupported format, EXIF/GPS, and adversarial text fixtures.
-- Store expected answers only for the deterministic fake provider. Do not assert natural-language
-  equality from a real model.
-- Every binary fixture has a short provenance/readme entry and expected security purpose.
-- Issue #3 image fixtures are generated programmatically by the security tests, keeping binary
-  provenance explicit without committing opaque sample files.
+## 夹具策略
 
-## Unit matrix
+- 只提交合成的、公有领域的，或由本项目创建的夹具，不含任何个人或机密数据。
+- 保持源夹具体积小。超大字节或极端尺寸的流应在测试中生成，而不是提交巨大的二进制文件。
+- 覆盖 PNG、JPEG、WebP、alpha 通道、方向元数据、畸形数据、误导性扩展名、不受支持格式、EXIF/GPS，以及对抗性文本夹具。
+- 只为确定性的假 Provider 存储预期答案。不要对真实模型断言自然语言相等。
+- 每个二进制夹具都有简短的来源/说明条目与预期的安全用途。
+- Issue
+  #3 的图像夹具由安全测试以编程方式生成，从而在不提交不透明样例文件的前提下，保持二进制来源清晰可查。
 
-### Configuration
+## 单元测试矩阵
 
-- required provider URL/model present and absent;
-- HTTPS remote and exact loopback HTTP acceptance;
-- rejection of credentials in URL, query, fragment, invalid port, operation-path ambiguity, and
-  non-HTTP schemes;
-- lower/upper bounds for every integer;
-- cwd-only root default and platform-delimited explicit roots;
-- nonexistent, relative, duplicate, nested, root-level, and home-level allowed roots;
-- secret redaction at every log level and error path.
-- fixed Qwen/DeepSeek endpoint, model, and default-effort mappings;
-- profile credential precedence: generic override, selected Provider environment variable, then
-  selected Keychain account;
-- an unselected Provider credential is never read and missing/failed Keychain lookup fails closed;
-- generic no-argument configuration remains backward compatible.
+### 配置
 
-### Credential CLI and macOS Keychain
+- 必填的 Provider URL/模型存在与缺失两种情况；
+- 远程 HTTPS 与精确回环 HTTP 的接受；
+- 拒绝 URL 中的凭据、query、fragment、非法端口、操作路径歧义与非 HTTP 协议；
+- 每个整数的上下边界；
+- 仅 cwd 的默认根目录，以及以平台分隔符分隔的显式根目录；
+- 不存在的、相对的、重复的、嵌套的、文件系统根级与主目录级的允许根目录；
+- 各日志级别与错误路径下的密钥脱敏。
+- 固定的 Qwen/DeepSeek 端点、模型与默认推理强度映射；
+- profile 凭据优先级：通用覆盖、所选 Provider 环境变量，然后是所选 Keychain 账户；
+- 未被选中的 Provider 凭据绝不被读取，且 Keychain 查询缺失/失败时失败即关闭；
+- 通用的「不带参数」配置保持向后兼容。
 
-- the CLI parser accepts only the documented profile and credential command grammar and returns
-  usage status `2` for invalid input;
-- set invokes the absolute system command without a shell, puts prompt-only `-w` last, passes no
-  secret argument, and rejects a non-interactive terminal;
-- get/status/delete use the exact service and selected account; status never requests password
-  output;
-- missing item exit status, unavailable platform, command failure, timeout, and oversized output map
-  to sanitized bounded behavior;
-- delete prompts by default, cancellation does not mutate state, and `--yes` is explicit;
-- synthetic canary values do not appear in errors, logs, status output, or serialized config.
+### 凭据 CLI 与 macOS Keychain
 
-### Input authorization
+- CLI 解析器只接受有文档记录的 profile 与凭据命令语法，非法输入返回用法状态码 `2`；
+- set 不经 shell 调用绝对路径系统命令，把仅提示用的 `-w`
+  放在最后，不传递任何密钥参数，并拒绝非交互式终端；
+- get/status/delete 使用精确的 service 与所选 account；status 绝不请求输出密码；
+- 条目缺失的退出状态、平台不可用、命令失败、超时与超大输出，都映射为脱敏且有界的行为；
+- delete 默认提示确认，取消不改变任何状态，`--yes` 必须显式给出；
+- 合成 canary 值不会出现在错误、日志、状态输出或序列化配置中。
 
-- absolute path acceptance inside a root;
-- relative path, traversal, sibling-prefix, separator, Unicode, and platform casing behavior;
-- target outside root through symlink/junction;
-- missing path, directory, and available special-file types;
-- exact source-byte limit, one byte over, and file growth during read;
-- cancellation before open, during read, and after read.
+### 输入授权
 
-### Clipboard reading
+- 根目录内绝对路径的接受；
+- 相对路径、路径穿越、同级前缀、分隔符、Unicode 与平台大小写行为；
+- 通过符号链接/junction 指向根目录之外的目标；
+- 路径缺失、目录，以及可用的特殊文件类型；
+- 精确的源字节上限、超出一个字节，以及读取过程中文件增长；
+- 打开前、读取中与读取后的取消。
 
-- non-macOS returns `CLIPBOARD_UNAVAILABLE` without spawning a helper;
-- confirmation precedes every read and rejection maps to `CLIPBOARD_ACCESS_DENIED`;
-- empty or non-image clipboard maps to `CLIPBOARD_NO_IMAGE`;
-- command failure, non-zero exit, and unexpected status map to `CLIPBOARD_READ_FAILED`;
-- cancellation before and during read maps to `CANCELLED`;
-- temporary file uses a user-private `0700` directory and a random name, and is deleted on success,
-  failure, limit rejection, and abort;
-- oversize staged image maps to `FILE_TOO_LARGE`.
+### 剪切板读取
 
-### Image pipeline
+- 非 macOS 返回 `CLIPBOARD_UNAVAILABLE` 且不启动辅助程序；
+- 确认先于每一次读取，拒绝映射为 `CLIPBOARD_ACCESS_DENIED`；
+- 剪切板为空或不含图片映射为 `CLIPBOARD_NO_IMAGE`；
+- 命令失败、非零退出与非预期状态映射为 `CLIPBOARD_READ_FAILED`；
+- 读取前与读取中的取消映射为 `CANCELLED`；
+- 临时文件使用用户私有的 `0700` 目录与随机文件名，并在成功、失败、超限拒绝与中止时被删除；
+- 暂存图片超大时映射为 `FILE_TOO_LARGE`。
 
-- PNG/JPEG/WebP detection from decoded content rather than extension;
-- unsupported, truncated, malformed, and misleading content;
-- source bytes, decoded pixels, dimension, and transmit-dimension boundaries;
-- transmit-byte and JPEG-quality boundaries, including an image that cannot be reduced safely;
-- EXIF orientation is applied and metadata is absent after output;
-- transparent input stays PNG; opaque output uses JPEG;
-- no enlargement below the transmit bound;
-- pixel and dimension failures map to stable errors;
-- cancellation and decoder exception sanitization.
+### 图像流水线
 
-### Domain and errors
+- 依据解码内容而非扩展名检测 PNG/JPEG/WebP；
+- 不受支持、被截断、畸形与误导性内容；
+- 源字节、解码像素、尺寸与传输尺寸的边界；
+- 传输字节与 JPEG 质量边界，包括无法被安全缩减的图片；
+- EXIF 方向被正确应用，且输出后元数据不再存在；
+- 透明输入保持 PNG；不透明输出使用 JPEG；
+- 低于传输边界时不做放大；
+- 像素与尺寸失败映射为稳定错误；
+- 取消与解码器异常的脱敏处理。
 
-- stable success/error schema validation;
-- every error code maps to the intended `isError`, message, and retryability;
-- no result contains path, prompt, bytes, endpoint, credential, raw body, or stack;
-- request IDs are present, valid, and do not encode user data;
-- provider-body rejection, answer truncation, Unicode-boundary handling, and `ANSWER_TRUNCATED`
-  behavior.
+### 领域与错误
 
-## Provider contract matrix
+- 稳定的成功/错误 schema 校验；
+- 每个错误码都映射到预期的 `isError`、消息与可重试性；
+- 任何结果都不包含路径、prompt、字节、端点、凭据、原始响应体或堆栈；
+- 请求 ID 存在、合法，且不编码用户数据；
+- Provider 响应体拒绝、答案截断、Unicode 边界处理与 `ANSWER_TRUNCATED` 行为。
 
-Use a local HTTP server bound to loopback and a deterministic fake clock/random source.
+## Provider 契约矩阵
 
-- request path, method, content type, model, safety system message, prompt, data URL, `max_tokens`,
-  and optional bearer header;
-- no authorization header when key is absent;
-- redirect is rejected without following the destination;
-- string and supported text-part response content;
-- empty, missing, malformed, non-JSON, oversized, and slowly streamed responses;
-- 400/401/403/404 without retry;
-- 408/429/502/503/504 with bounded retry;
-- other 4xx/5xx mapping;
-- valid and invalid `Retry-After`, jitter bounds, attempt count, and overall deadline;
-- cancellation during request and backoff;
-- usage extraction only for non-negative integer values;
-- canary secrets inserted into URL, key, prompt, and body never appear in result/log snapshots.
+使用绑定到回环地址的本地 HTTP 服务，以及确定性的假时钟/随机源。
 
-## MCP integration matrix
+- 请求路径、方法、内容类型、模型、安全 system 消息、prompt、data URL、`max_tokens`
+  与可选 bearer 头；
+- 无密钥时不发送 authorization 头；
+- 重定向被拒绝且不跟随目标地址；
+- 字符串形式与受支持的 text-part 形式响应内容；
+- 空、缺失、畸形、非 JSON、超大以及慢速流式响应；
+- 400/401/403/404 不重试；
+- 408/429/502/503/504 进行有界重试；
+- 其它 4xx/5xx 的映射；
+- 合法与非法的 `Retry-After`、抖动边界、尝试次数与整体截止时间；
+- 请求期间与退避期间的取消；
+- 仅当为非负整数时才提取 usage；
+- 插入到 URL、密钥、prompt 与响应体中的 canary 密钥，绝不出现在结果/日志快照中。
 
-Spawn the built CLI with separate stdin/stdout/stderr pipes and connect with the official MCP
-client.
+## MCP 集成矩阵
 
-- initialization and protocol negotiation;
-- deterministic single-tool discovery and exact metadata/schema;
-- successful call returns one readable text block and schema-valid structured content;
-- failed call sets `isError: true` and returns schema-valid sanitized error content;
-- unknown fields and invalid arguments are rejected;
-- cancellation propagates and leaves the next call healthy;
-- bounded parallel calls, queue full behavior, and clean shutdown;
-- stdout parses entirely as MCP traffic; all diagnostics are on stderr;
-- startup configuration failure exits non-zero before accepting protocol input;
-- `--provider qwen|deepseek` initializes and lists the Tool with the selected environment-key
-  fallback while an invalid profile exits before emitting protocol stdout;
-- a 2025-era compatibility handshake is included if the official v2 SDK test client supports it
-  without legacy server code.
+以独立的 stdin/stdout/stderr 管道派生已构建的 CLI，并用官方 MCP 客户端连接。
 
-## Host compatibility matrix
+- 初始化与协议协商；
+- 确定性的单工具发现与精确的元数据/schema；
+- 成功调用返回一个可读文本块与符合 schema 的结构化内容；
+- 失败调用设置 `isError: true` 并返回符合 schema 的脱敏错误内容；
+- 未知字段与非法参数被拒绝；
+- 取消能够传播，且下一次调用仍然健康；
+- 有界并行调用、队列满行为与干净关闭；
+- stdout 可被完整解析为 MCP 流量；所有诊断都在 stderr；
+- 启动配置失败时在接受协议输入之前以非零状态退出；
+- `--provider qwen|deepseek`
+  能够初始化并列出工具（使用所选的环境变量密钥回退），而非法 profile 在输出协议 stdout 之前即退出；
+- 若官方 v2 SDK 测试客户端在不引入遗留服务端代码的前提下支持，则纳入一次 2025 era 兼容握手。
 
-Run before a v0.1.0 release using the packed artifact, not the source checkout.
+## 宿主兼容性矩阵
 
-| Host        | Configuration                                        | Smoke scenarios                                                                                |
-| ----------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Claude Code | documented user-level and project-level stdio launch | tool discovery; chart question; OCR-style question; denied path; cancellation/provider failure |
-| Codex       | documented project/user stdio MCP configuration      | same fixture and prompt set; structured result visible; stderr does not corrupt startup        |
+在 v0.1.0 发布前使用打包制品运行，而不是源码检出。
 
-Record host version, Node version, operating system, package digest, provider type (local fake/local
-real/remote real), result, and sanitized failure evidence. Do not publish keys, personal paths,
-images, or complete provider payloads.
+| 宿主        | 配置                                      | 冒烟场景                                                         |
+| ----------- | ----------------------------------------- | ---------------------------------------------------------------- |
+| Claude Code | 有文档记录的用户级与项目级 stdio 启动方式 | 工具发现；图表提问；OCR 式提问；被拒绝的路径；取消/Provider 故障 |
+| Codex       | 有文档记录的项目/用户级 stdio MCP 配置    | 相同的夹具与 prompt 集合；结构化结果可见；stderr 不破坏启动      |
 
-At least one release-candidate smoke run uses a local OpenAI-compatible endpoint. Before Issue #16
-is accepted for release, both documented profiles require a user-authorized remote smoke test with
-non-sensitive synthetic chart/OCR fixtures, and at least one Claude Code and one Codex entry must
-launch the packed artifact with `--provider`. Natural-language answers are reviewed for capability,
-not asserted byte-for-byte.
+记录宿主版本、Node 版本、操作系统、包摘要、Provider 类型（本地假的/本地真实的/远程真实的）、结果与脱敏后的失败证据。不要公开密钥、个人路径、图片或完整的 Provider 载荷。
 
-On macOS, validate the actual Keychain boundary separately with a generated canary under an isolated
-test service name: write interactively, check existence without revealing it, read and compare it in
-memory, delete the exact item, and confirm it is absent. The cleanup result is part of the sanitized
-test record. Never overwrite or read a user's production `qwen` or `deepseek` item for this check.
+至少一次 release-candidate 冒烟运行使用本地 OpenAI 兼容端点。在 Issue
+#16 被接受进入发布之前，两个有文档记录的 profile 都需要一次经用户授权的远程冒烟测试（使用非敏感的合成图表/OCR 夹具），并且至少要有一条 Claude
+Code 记录和一条 Codex 记录是以 `--provider`
+启动打包制品的。自然语言答案按能力进行人工审阅，而不做逐字节断言。
 
-## CI design
+在 macOS 上，需单独验证真实的 Keychain 边界：在一个隔离的测试 service 名下使用生成的 canary，交互式写入、在不泄露的前提下检查存在性、在内存中读取并比对、删除该精确条目，并确认其已不存在。清理结果是脱敏测试记录的一部分。绝不为此项检查覆盖或读取用户生产环境的
+`qwen` 或 `deepseek` 条目。
 
-### Pull-request fast layer
+## CI 设计
 
-Run formatting check, ESLint, TypeScript checking, unit/provider-contract tests, build, packed-file
-inspection, credential scan, and dependency review where available. The goal is actionable feedback
-in minutes, not a hard-coded duration promise.
+### PR 快速层
 
-### Full validation layer
+运行格式检查、ESLint、TypeScript 检查、单元/Provider 契约测试、构建、打包文件检查、凭据扫描，以及可用时的依赖审查。目标是在几分钟内给出可操作的反馈，而不是承诺某个写死的时长。
 
-Run stdio integration, supported Node LTS matrix, supported operating-system matrix needed by
-`sharp`, security fixtures, and clean tarball install. Slow compatibility tests may be separated but
-remain required for release.
+### 完整验证层
 
-### Main and release layers
+运行 stdio 集成测试、受支持的 Node LTS 矩阵、`sharp`
+所需的受支持操作系统矩阵、安全夹具，以及干净的 tarball 安装。较慢的兼容性测试可以拆分出去，但发布前仍然必需。
 
-Main rebuilds and verifies the authoritative tarball. Release consumes that same artifact, records
-SHA-256, generates an ecosystem-appropriate SBOM and provenance/attestation when platform support is
-available, then performs clean install and host smoke tests before publishing.
+### 主干与发布层
 
-Do not rebuild a different tarball during release promotion.
+主干重新构建并校验权威 tarball。发布流程消费同一份制品，记录 SHA-256，在平台支持时生成符合生态惯例的 SBOM 与 provenance/attestation，然后在发布前执行干净安装与宿主冒烟测试。
 
-### Workflow security
+发布晋级过程中不得重新构建另一个 tarball。
 
-- Default `GITHUB_TOKEN` permissions are read-only; jobs receive only specific required writes.
-- Third-party Actions and reusable workflows are pinned to full commit SHAs and reviewed before
-  adoption.
-- Untrusted pull-request code does not run in privileged `pull_request_target` or `workflow_run`
-  contexts.
-- Public pull requests do not receive repository or provider secrets.
-- Cache keys and downloaded artifacts do not cross trust boundaries without digest validation.
+### 工作流安全
 
-## Local quality commands
+- 默认 `GITHUB_TOKEN` 权限为只读；各 job 只获得其确实需要的写权限。
+- 第三方 Actions 与可复用工作流固定到完整 commit SHA，并在采用前经过评审。
+- 不可信的 PR 代码不在特权的 `pull_request_target` 或 `workflow_run` 上下文中运行。
+- 公开 PR 不会获得仓库或 Provider 密钥。
+- 缓存键与下载制品未经摘要校验不得跨越信任边界。
 
-The scaffold Issue should provide scripts with these stable intentions:
+## 本地质量命令
+
+脚手架 Issue 应提供具备如下稳定语义的脚本：
 
 ```bash
 pnpm format:check
@@ -220,34 +194,28 @@ pnpm pack:check
 pnpm audit:prod
 ```
 
-CI invokes the same scripts rather than duplicating behavior in workflow YAML.
+CI 调用与本地相同的脚本，而不是在工作流 YAML 中重复实现行为。
 
-Package tests and host examples must use the scoped distribution name selected by the scaffold
-Issue. They must never install or invoke the unrelated unscoped `sight-mcp` package.
+包测试与宿主示例必须使用脚手架 Issue 选定的 scoped 分发名。它们绝不能安装或调用无关的、未加 scope 的
+`sight-mcp` 包。
 
-## Coverage and flaky tests
+## 覆盖率与不稳定测试
 
-- Collect branch and line coverage to identify gaps; do not invent a repository-wide threshold
-  before a baseline exists.
-- Security decisions, schema discriminants, error mappings, retry branches, and redaction branches
-  require direct tests regardless of aggregate percentage.
-- A flaky required test is a defect. Temporary quarantine requires an Issue, owner, reason,
-  compensating check, and expiry date; retry-after-pass is not treated as healthy.
+- 收集分支与行覆盖率以识别缺口；在基线尚未建立之前，不要凭空规定一个全仓库阈值。
+- 安全决策、schema 判别字段、错误映射、重试分支与脱敏分支，无论总体百分比如何，都需要直接测试。
+- 必需测试出现 flaky 属于缺陷。临时隔离需要 Issue、责任人、原因、补偿性检查与到期日期；「重跑一次通过」不视为健康。
 
-## Release acceptance
+## 发布验收
 
-- [ ] Fast and full CI layers pass on the release commit.
-- [ ] No known unreviewed failure exists in security-critical branches.
-- [ ] Packed contents contain only intended runtime, documentation, license, and metadata files.
-- [ ] Clean install and CLI launch succeed from the tarball.
-- [ ] Claude Code and Codex smoke records pass against the same artifact digest.
-- [ ] Dependency, license, secret, and vulnerability checks are reviewed.
-- [ ] SBOM/provenance policy is satisfied or a documented platform limitation is recorded.
-- [ ] Release notes include known limitations, privacy behavior, supported formats, configuration,
-      upgrade, and rollback instructions.
+- [ ] 快速层与完整层 CI 在发布 commit 上通过。
+- [ ] 安全关键分支中不存在已知且未经评审的失败。
+- [ ] 打包内容只包含预期的运行时、文档、许可证与元数据文件。
+- [ ] 从 tarball 干净安装并启动 CLI 成功。
+- [ ] Claude Code 与 Codex 的冒烟记录针对同一制品摘要通过。
+- [ ] 依赖、许可证、密钥与漏洞检查均已评审。
+- [ ] SBOM/provenance 策略已满足，或已记录有文档说明的平台限制。
+- [ ] 发布说明包含已知限制、隐私行为、受支持格式、配置、升级与回滚指引。
 
-## Rollback and forward fix
+## 回滚与向前修复
 
-Before publication, reject the candidate and fix forward on a new commit. After publication, do not
-overwrite an npm version. Deprecate the affected version, document impact, publish a corrected patch
-from reviewed source, and preserve the original artifact and audit record.
+发布前，拒绝该候选版本并在新 commit 上向前修复。发布后，不得覆盖某个 npm 版本。应弃用受影响版本、记录影响范围、从已评审源码发布修正后的补丁版本，并保留原始制品与审计记录。
