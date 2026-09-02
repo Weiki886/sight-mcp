@@ -46,6 +46,8 @@ npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
 - **只读设计** —— 仅两个职责单一的窄口径工具，不会把任意文件读取、shell 或网络访问能力交给模型。
 - **安全的文件访问** —— 读取前基于 `SIGHT_ALLOWED_ROOTS`
   做绝对路径校验、路径规范化，并对符号链接边界进行检查。
+- **工作区外一次性授权（macOS）** —— 当 `analyze_image` 的绝对路径位于 `SIGHT_ALLOWED_ROOTS`
+  之外时，会弹出一个一次性原生确认框，允许后才读取；拒绝则返回 `PATH_ACCESS_DENIED`。
 - **纯内存处理** —— `analyze_image`
   不产生任何临时副本；图片在发送前于内存中移除元数据、校正方向、不做放大只做缩小。
 - **一键读取剪切板（macOS）** —— `analyze_clipboard_image`
@@ -147,7 +149,9 @@ analyze_image(path, prompt)
 analyze_clipboard_image(prompt)   (仅 macOS)
 ```
 
-- `path` 必须是经过规范化解析后位于某个 `SIGHT_ALLOWED_ROOTS` 之内的绝对路径。
+- `path` 必须是绝对路径。位于 `SIGHT_ALLOWED_ROOTS`
+  之内的路径会被直接读取；在 macOS 上，位于工作区之外的路径会先弹出一个一次性原生授权框，允许后才读取。用户直接粘贴的图片请改用
+  `analyze_clipboard_image`。
 - `prompt` 是一个非空问题，最多 8,000 个字符。
 - `analyze_clipboard_image`
   在弹出一个原生的一键确认对话框后读取系统剪切板当前图片。它不接受路径，因此 `SIGHT_ALLOWED_ROOTS`
@@ -251,7 +255,7 @@ Sight MCP 从不跟随重定向，也从不静默切换端点。它只对连接�
 
 | 类别           | 错误码                                                                                                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| 输入/路径/文件 | `INVALID_INPUT`、`PATH_NOT_ABSOLUTE`、`PATH_NOT_ALLOWED`、`FILE_NOT_FOUND`、`FILE_NOT_REGULAR`、`FILE_TOO_LARGE`                                |
+| 输入/路径/文件 | `INVALID_INPUT`、`PATH_ACCESS_DENIED`、`PATH_NOT_ABSOLUTE`、`PATH_NOT_ALLOWED`、`FILE_NOT_FOUND`、`FILE_NOT_REGULAR`、`FILE_TOO_LARGE`          |
 | 剪切板         | `CLIPBOARD_ACCESS_DENIED`、`CLIPBOARD_NO_IMAGE`、`CLIPBOARD_READ_FAILED`、`CLIPBOARD_UNAVAILABLE`                                               |
 | 图像           | `UNSUPPORTED_MEDIA`、`IMAGE_TOO_LARGE`、`IMAGE_DECODE_FAILED`                                                                                   |
 | 容量/生命周期  | `QUEUE_FULL`、`CANCELLED`、`INTERNAL_ERROR`                                                                                                     |
@@ -271,6 +275,7 @@ Sight MCP 从不跟随重定向，也从不静默切换端点。它只对连接�
   允许的根目录必须是已存在的绝对目录；非回环的 HTTP 端点会被拒绝，必须使用 HTTPS。
 - **`PATH_NOT_ALLOWED`：**
   传入一个位于窄口径允许根目录之下的规范化绝对路径。符号链接无法绕过该边界。
+- **`PATH_ACCESS_DENIED`：** macOS 上弹出的授权框被拒绝或取消。重试该工具，并在弹出时选择允许。
 - **`CLIPBOARD_ACCESS_DENIED`：** 确认对话框被取消或拒绝。重试该工具，并在弹出时选择允许。
 - **`CLIPBOARD_NO_IMAGE`：** 先把 PNG、JPEG 或 WebP 图片复制到剪切板，然后重试。
 - **`CLIPBOARD_UNAVAILABLE`：** v0.1.0 中剪切板读取仅限 macOS。在其它平台上改用 `analyze_image`

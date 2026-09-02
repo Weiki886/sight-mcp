@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createNodeInputGuard,
   readFileBounded,
 } from "../../src/infrastructure/filesystem/node-input-guard.js";
+import type { OutsideRootAuthorization } from "../../src/infrastructure/filesystem/node-input-guard.js";
 
 const temporaryDirectories: string[] = [];
 const execFileAsync = promisify(execFile);
@@ -50,6 +51,64 @@ describe("node input guard", () => {
       error: { code: "PATH_NOT_ALLOWED" },
       ok: false,
     });
+  });
+
+  it("allows an out-of-root path after a one-time user authorization", async () => {
+    const directory = await temporaryDirectory();
+    const allowed = join(directory, "allowed");
+    const outside = join(directory, "outside");
+    await Promise.all([mkdir(allowed), mkdir(outside)]);
+    const outsideFile = join(outside, "approved.png");
+    await writeFile(outsideFile, "approved-bytes");
+    const authorizer = vi.fn<
+      (_path: string, _signal: AbortSignal) => Promise<OutsideRootAuthorization>
+    >(() => Promise.resolve("ALLOWED"));
+    const guard = createNodeInputGuard(
+      { allowedRoots: [await realpath(allowed)], maxImageBytes: 100 },
+      authorizer,
+    );
+
+    const result = await guard.readAuthorizedImage(outsideFile, new AbortController().signal);
+    expect(result).toMatchObject({ ok: true, value: { originalBytes: 14 } });
+    expect(authorizer).toHaveBeenCalledOnce();
+  });
+
+  it("returns PATH_ACCESS_DENIED when the user refuses an out-of-root path", async () => {
+    const directory = await temporaryDirectory();
+    const allowed = join(directory, "allowed");
+    const outside = join(directory, "outside");
+    await Promise.all([mkdir(allowed), mkdir(outside)]);
+    const outsideFile = join(outside, "rejected.png");
+    await writeFile(outsideFile, "rejected-bytes");
+    const authorizer = vi.fn<
+      (_path: string, _signal: AbortSignal) => Promise<OutsideRootAuthorization>
+    >(() => Promise.resolve("DENIED"));
+    const guard = createNodeInputGuard(
+      { allowedRoots: [await realpath(allowed)], maxImageBytes: 100 },
+      authorizer,
+    );
+
+    await expect(
+      guard.readAuthorizedImage(outsideFile, new AbortController().signal),
+    ).resolves.toMatchObject({ error: { code: "PATH_ACCESS_DENIED" }, ok: false });
+    expect(authorizer).toHaveBeenCalledOnce();
+  });
+
+  it("keeps returning PATH_NOT_ALLOWED when no out-of-root authorizer is configured", async () => {
+    const directory = await temporaryDirectory();
+    const allowed = join(directory, "allowed");
+    const outside = join(directory, "outside");
+    await Promise.all([mkdir(allowed), mkdir(outside)]);
+    const outsideFile = join(outside, "unapproved.png");
+    await writeFile(outsideFile, "unapproved-bytes");
+    const guard = createNodeInputGuard({
+      allowedRoots: [await realpath(allowed)],
+      maxImageBytes: 100,
+    });
+
+    await expect(
+      guard.readAuthorizedImage(outsideFile, new AbortController().signal),
+    ).resolves.toMatchObject({ error: { code: "PATH_NOT_ALLOWED" }, ok: false });
   });
 
   it("rejects a symlink that resolves outside the allowed root (FS-02)", async () => {

@@ -69,6 +69,7 @@ const failureSchema = z
           "CLIPBOARD_NO_IMAGE",
           "CLIPBOARD_READ_FAILED",
           "CLIPBOARD_UNAVAILABLE",
+          "PATH_ACCESS_DENIED",
           "PATH_NOT_ABSOLUTE",
           "PATH_NOT_ALLOWED",
           "FILE_NOT_FOUND",
