@@ -1,6 +1,6 @@
 # v0.1.0 release process
 
-- Status: release-candidate automation implemented; publication approval pending
+- Status: published 2026-09-02; tag `v0.1.0` and GitHub Release shipped
 - Owner: repository maintainer
 - Related: [Issue #6](https://github.com/Weiki886/sight-mcp/issues/6),
   [v0.1.0 release notes](v0.1.0.md), [Host smoke procedure](host-smoke.md),
@@ -64,7 +64,9 @@ Before publication, the maintainer must verify all of the following against one 
 
 At preparation time on 2026-08-31, the package registry returned `E404`, this workstation was not
 authenticated to npm, and the `@weiki` scope could not be proven. Publication therefore remains
-blocked even though candidate engineering can be merged.
+blocked even though candidate engineering can be merged. On 2026-09-02 the maintainer resolved the
+identity and published `@weiki/sight-mcp@0.1.0`, then shipped the `v0.1.0` tag and GitHub Release;
+scope ownership is now proven by the live, account-signed package.
 
 ## Publication sequence after approval
 
