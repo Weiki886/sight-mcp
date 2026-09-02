@@ -1,6 +1,6 @@
 <div align="center">
 
-# 👁️ Sight MCP
+# Sight MCP
 
 **Give your text-only agent eyes.** A secure Model Context Protocol (MCP) vision bridge that adds
 image recognition to Claude Code, Codex, and any stdio MCP host — without handing the model an
