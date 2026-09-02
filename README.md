@@ -1,6 +1,6 @@
 <div align="center">
 
-# 👁️ Sight MCP
+# Sight MCP
 
 **让只会读文字的 Agent 拥有视觉能力。** 一个安全的 Model Context
 Protocol（MCP）视觉桥接服务，为 Claude Code、Codex 以及任何 stdio
