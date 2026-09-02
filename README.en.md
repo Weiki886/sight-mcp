@@ -51,6 +51,9 @@ image to the clipboard and call `analyze_clipboard_image(prompt)` without any pa
   network access granted to the model.
 - **Safe file access** — absolute-path validation against `SIGHT_ALLOWED_ROOTS`, canonicalization,
   and symlink-aware boundary checks before any bytes are read.
+- **One-time out-of-root authorization (macOS)** — when an `analyze_image` path falls outside
+  `SIGHT_ALLOWED_ROOTS`, a one-time native confirmation dialog is shown and the file is read only
+  after approval; refusing returns `PATH_ACCESS_DENIED`.
 - **In-memory processing** — `analyze_image` makes no temporary copies; images are stripped of
   metadata, orientation-corrected, and resized without enlargement in RAM before transmission.
 - **One-click clipboard reading (macOS)** — `analyze_clipboard_image` asks for explicit native
@@ -154,7 +157,9 @@ analyze_image(path, prompt)
 analyze_clipboard_image(prompt)   (macOS only)
 ```
 
-- `path` must be an absolute path inside one of `SIGHT_ALLOWED_ROOTS` after canonical resolution.
+- `path` must be an absolute path. Paths inside `SIGHT_ALLOWED_ROOTS` are read directly; on macOS,
+  paths outside the roots trigger a one-time native authorization dialog before they are read. For
+  images the user pasted directly, prefer `analyze_clipboard_image`.
 - `prompt` is a non-empty question of at most 8,000 characters.
 - `analyze_clipboard_image` reads the image currently on the system clipboard after a native
   one-click confirmation dialog. It takes no path, so `SIGHT_ALLOWED_ROOTS` does not apply, and the
@@ -268,7 +273,7 @@ structured JSON on stderr; stdout is reserved exclusively for MCP protocol traff
 
 | Category           | Codes                                                                                                                                           |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| input/path/file    | `INVALID_INPUT`, `PATH_NOT_ABSOLUTE`, `PATH_NOT_ALLOWED`, `FILE_NOT_FOUND`, `FILE_NOT_REGULAR`, `FILE_TOO_LARGE`                                |
+| input/path/file    | `INVALID_INPUT`, `PATH_ACCESS_DENIED`, `PATH_NOT_ABSOLUTE`, `PATH_NOT_ALLOWED`, `FILE_NOT_FOUND`, `FILE_NOT_REGULAR`, `FILE_TOO_LARGE`          |
 | clipboard          | `CLIPBOARD_ACCESS_DENIED`, `CLIPBOARD_NO_IMAGE`, `CLIPBOARD_READ_FAILED`, `CLIPBOARD_UNAVAILABLE`                                               |
 | image              | `UNSUPPORTED_MEDIA`, `IMAGE_TOO_LARGE`, `IMAGE_DECODE_FAILED`                                                                                   |
 | capacity/lifecycle | `QUEUE_FULL`, `CANCELLED`, `INTERNAL_ERROR`                                                                                                     |
@@ -291,6 +296,8 @@ hosts should avoid immediate unbounded retry loops.
   HTTP endpoints are rejected and must use HTTPS.
 - **`PATH_NOT_ALLOWED`:** pass an absolute canonical path under a narrow allowed root. Symlinks do
   not bypass the boundary.
+- **`PATH_ACCESS_DENIED`:** the one-time authorization dialog on macOS was denied or cancelled.
+  Retry the tool and choose Allow when it appears.
 - **`CLIPBOARD_ACCESS_DENIED`:** the confirmation dialog was cancelled or denied. Retry the tool and
   choose Allow when it appears.
 - **`CLIPBOARD_NO_IMAGE`:** copy a PNG, JPEG, or WebP image to the clipboard first, then retry.

@@ -10,6 +10,7 @@ export type ImageErrorCode =
   | "IMAGE_DECODE_FAILED"
   | "IMAGE_TOO_LARGE"
   | "INTERNAL_ERROR"
+  | "PATH_ACCESS_DENIED"
   | "PATH_NOT_ABSOLUTE"
   | "PATH_NOT_ALLOWED"
   | "UNSUPPORTED_MEDIA";
@@ -67,6 +68,8 @@ const errorMessages: Readonly<Record<ImageErrorCode, string>> = Object.freeze({
   IMAGE_DECODE_FAILED: "The image could not be decoded safely.",
   IMAGE_TOO_LARGE: "The image exceeds the configured processing limits.",
   INTERNAL_ERROR: "The image could not be processed because of an internal error.",
+  PATH_ACCESS_DENIED:
+    "Access to the image outside the configured allowed roots was denied by the user.",
   PATH_NOT_ABSOLUTE: "The image path must be absolute.",
   PATH_NOT_ALLOWED: "The image is outside the configured allowed roots.",
   UNSUPPORTED_MEDIA: "Only PNG, JPEG, and WebP images are supported.",

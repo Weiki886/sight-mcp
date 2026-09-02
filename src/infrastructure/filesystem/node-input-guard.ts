@@ -41,6 +41,13 @@ function isWithinRoot(root: string, candidate: string): boolean {
   );
 }
 
+export type OutsideRootAuthorization = "ALLOWED" | "DENIED";
+
+export type OutsideRootAuthorizer = (
+  canonicalPath: string,
+  signal: AbortSignal,
+) => Promise<OutsideRootAuthorization>;
+
 function errorCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) {
     return undefined;
@@ -92,7 +99,10 @@ export async function readFileBounded(
   return Object.freeze({ kind: "too-large" });
 }
 
-export function createNodeInputGuard(config: InputGuardConfig): InputGuard {
+export function createNodeInputGuard(
+  config: InputGuardConfig,
+  authorizeOutsideRoot?: OutsideRootAuthorizer,
+): InputGuard {
   return Object.freeze({
     async readAuthorizedImage(
       inputPath: string,
@@ -112,8 +122,22 @@ export function createNodeInputGuard(config: InputGuardConfig): InputGuard {
         return fileAccessFailure(error);
       }
 
-      if (!config.allowedRoots.some((root) => isWithinRoot(root, canonicalPath))) {
-        return imageFailure("PATH_NOT_ALLOWED");
+      const isAuthorizedRoot = (candidate: string): boolean =>
+        config.allowedRoots.some((root) => isWithinRoot(root, candidate));
+      let authorizedOutsideRoot = false;
+
+      if (!isAuthorizedRoot(canonicalPath)) {
+        if (authorizeOutsideRoot === undefined) {
+          return imageFailure("PATH_NOT_ALLOWED");
+        }
+        const authorization = await authorizeOutsideRoot(canonicalPath, signal);
+        if (isAborted(signal)) {
+          return imageFailure("CANCELLED");
+        }
+        if (authorization !== "ALLOWED") {
+          return imageFailure("PATH_ACCESS_DENIED");
+        }
+        authorizedOutsideRoot = true;
       }
       if (isAborted(signal)) {
         return imageFailure("CANCELLED");
@@ -131,7 +155,11 @@ export function createNodeInputGuard(config: InputGuardConfig): InputGuard {
 
       try {
         const currentCanonicalPath = await realpath(canonicalPath);
-        if (!config.allowedRoots.some((root) => isWithinRoot(root, currentCanonicalPath))) {
+        if (
+          authorizedOutsideRoot
+            ? currentCanonicalPath !== canonicalPath
+            : !isAuthorizedRoot(currentCanonicalPath)
+        ) {
           return imageFailure("PATH_NOT_ALLOWED");
         }
         const [openedStatus, pathStatus] = await Promise.all([

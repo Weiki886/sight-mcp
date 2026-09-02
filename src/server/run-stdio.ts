@@ -9,6 +9,7 @@ import type { AppConfig } from "../config.js";
 import { createMacOSClipboardImageReader } from "../infrastructure/clipboard/macos-clipboard-image-reader.js";
 import { createNodeInputGuard } from "../infrastructure/filesystem/node-input-guard.js";
 import { createSharpImagePipeline } from "../infrastructure/image/sharp-image-pipeline.js";
+import { createMacOSPathAccessAuthorizer } from "../infrastructure/macos/path-access-authorizer.js";
 import { createOpenAICompatibleProvider } from "../infrastructure/provider/openai-compatible-provider.js";
 import type { Logger } from "../logger.js";
 import { SERVER_NAME, VERSION } from "../version.js";
@@ -25,7 +26,10 @@ export function startStdioServer(config: AppConfig, logger: Logger): StdioServer
     version: VERSION,
   });
 
-  const inputGuard = createNodeInputGuard(config.image);
+  const inputGuard = createNodeInputGuard(
+    config.image,
+    process.platform === "darwin" ? createMacOSPathAccessAuthorizer() : undefined,
+  );
   const pipeline = createSharpImagePipeline(config.image);
   const provider = createOpenAICompatibleProvider(config.provider, { logger });
   const queue = createBoundedWorkQueue(

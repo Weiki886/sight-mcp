@@ -68,6 +68,10 @@ The input is a closed object; unknown fields are rejected.
 The tool call cannot override provider, endpoint, model, credentials, headers, timeouts, retries,
 allowed roots, or image limits.
 
+On macOS, an `analyze_image` path outside every allowed root triggers a one-time native
+authorization dialog; allowing reads just that file once, and refusing returns `PATH_ACCESS_DENIED`.
+On other platforms the request fails with `PATH_NOT_ALLOWED`.
+
 ### Input schema: `analyze_clipboard_image`
 
 The clipboard tool accepts only the analysis `prompt`; it has no `path` and no way to change the
@@ -179,6 +183,7 @@ The structured result remains object-shaped for compatibility with clients preda
 | Code                        | Meaning                                                                | Retryable |
 | --------------------------- | ---------------------------------------------------------------------- | --------- |
 | `INVALID_INPUT`             | Schema, prompt, or argument validation failed                          | no        |
+| `PATH_ACCESS_DENIED`        | The user denied the one-time out-of-root authorization                 | no        |
 | `PATH_NOT_ABSOLUTE`         | `path` is not absolute on the current platform                         | no        |
 | `PATH_NOT_ALLOWED`          | Canonical target is outside every allowed root                         | no        |
 | `FILE_NOT_FOUND`            | Target disappeared or does not exist                                   | no        |
