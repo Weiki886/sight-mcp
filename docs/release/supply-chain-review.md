@@ -2,7 +2,7 @@
 
 - Reviewed: 2026-08-31
 - Scope: release preparation in Issue #6
-- Decision: candidate automation accepted; npm identity and final publication remain blocked
+- Decision: candidate automation accepted; npm identity proven and v0.1.0 published on 2026-09-02
 
 ## Package boundary
 
