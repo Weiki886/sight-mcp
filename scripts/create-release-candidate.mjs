@@ -21,6 +21,14 @@ const nodeCommand = process.execPath;
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
+/**
+ * The declared package version, read once so the candidate artifacts, SBOM
+ * name, and manifest can never drift from `package.json`.
+ */
+const packageVersion = JSON.parse(
+  await readFile(join(projectRoot, "package.json"), "utf8"),
+).version;
+
 function argumentValue(name) {
   const index = process.argv.indexOf(name);
   if (index === -1) {
@@ -169,7 +177,7 @@ async function runInstalledSmoke(archivePath, installDirectory) {
   });
   const stderrChunks = [];
   transport.stderr?.on("data", (chunk) => stderrChunks.push(chunk.toString("utf8")));
-  const client = new Client({ name: "sight-mcp-release-smoke", version: "0.1.0" });
+  const client = new Client({ name: "sight-mcp-release-smoke", version: packageVersion });
 
   try {
     await client.connect(transport);
@@ -325,7 +333,7 @@ try {
 
   const digest = await sha256(archivePath);
   const smoke = await runInstalledSmoke(archivePath, cleanInstallDirectory);
-  const sbomName = "sight-mcp-0.1.0.sbom.cdx.json";
+  const sbomName = `sight-mcp-${packageVersion}.sbom.cdx.json`;
   await writeFile(join(outputDirectory, sbomName), `${JSON.stringify(smoke.sbom, null, 2)}\n`);
 
   const sourceCommit =
@@ -351,7 +359,7 @@ try {
       file: basename(archivePath),
       packageName: "@weiki/sight-mcp",
       sha256: digest,
-      version: "0.1.0",
+      version: packageVersion,
     }),
     environment: Object.freeze({
       architecture: process.arch,

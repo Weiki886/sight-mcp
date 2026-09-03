@@ -86,8 +86,15 @@ async function verifyArchive(archivePath) {
   if (packedPackageJson.name !== "@weiki/sight-mcp") {
     throw new Error("Package name must remain @weiki/sight-mcp.");
   }
-  if (packedPackageJson.version !== "0.1.0" || rootPackageJson.version !== "0.1.0") {
-    throw new Error("Release candidate version must be 0.1.0.");
+  // The declared version is the single source of truth: the packed archive
+  // must agree with the working tree rather than with a value copied here.
+  if (packedPackageJson.version !== rootPackageJson.version) {
+    throw new Error(
+      `Packed version ${packedPackageJson.version} does not match declared version ${rootPackageJson.version}.`,
+    );
+  }
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(rootPackageJson.version)) {
+    throw new Error(`Declared version ${rootPackageJson.version} is not a valid release version.`);
   }
   if (packedPackageJson.private !== undefined || rootPackageJson.private !== undefined) {
     throw new Error("Release candidate package metadata must not be private.");
@@ -161,7 +168,8 @@ try {
     await execFileAsync(pnpmCommand, ["pack", "--pack-destination", temporaryDirectory], {
       cwd: projectRoot,
     });
-    archivePath = join(temporaryDirectory, "weiki-sight-mcp-0.1.0.tgz");
+    const { version } = JSON.parse(await readFile(join(projectRoot, "package.json"), "utf8"));
+    archivePath = join(temporaryDirectory, `weiki-sight-mcp-${version}.tgz`);
   }
   await access(archivePath);
   await verifyArchive(archivePath);
