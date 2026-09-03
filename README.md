@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/Weiki886/sight-mcp/main/docs/logo.png" alt="Sight MCP" width="420">
+
 # Sight MCP
 
 **让只会读文字的 Agent 拥有视觉能力。** 一个安全的 Model Context
