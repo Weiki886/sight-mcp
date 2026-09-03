@@ -13,6 +13,13 @@ import {
 
 type InputGuardConfig = Pick<ImageConfig, "allowedRoots" | "maxImageBytes">;
 
+/**
+ * Supplies roots discovered after configuration load (for example the client's
+ * workspace roots), so the guard can consult them without the configuration
+ * object becoming mutable.
+ */
+export type DynamicRootsProvider = () => readonly string[];
+
 type BoundedReadResult =
   | Readonly<{ bytes: Uint8Array; kind: "ok" }>
   | Readonly<{ kind: "cancelled" }>
@@ -102,6 +109,7 @@ export async function readFileBounded(
 export function createNodeInputGuard(
   config: InputGuardConfig,
   authorizeOutsideRoot?: OutsideRootAuthorizer,
+  dynamicRoots?: DynamicRootsProvider,
 ): InputGuard {
   return Object.freeze({
     async readAuthorizedImage(
@@ -123,7 +131,8 @@ export function createNodeInputGuard(
       }
 
       const isAuthorizedRoot = (candidate: string): boolean =>
-        config.allowedRoots.some((root) => isWithinRoot(root, candidate));
+        config.allowedRoots.some((root) => isWithinRoot(root, candidate)) ||
+        (dynamicRoots?.() ?? []).some((root) => isWithinRoot(root, candidate));
       let authorizedOutsideRoot = false;
 
       if (!isAuthorizedRoot(canonicalPath)) {

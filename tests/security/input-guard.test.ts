@@ -234,4 +234,86 @@ describe("node input guard", () => {
       guard.readAuthorizedImage(join(directory, "image.png"), controller.signal),
     ).resolves.toMatchObject({ error: { code: "CANCELLED" }, ok: false });
   });
+
+  it("accepts a path inside a dynamic root discovered from the client workspace", async () => {
+    const directory = await temporaryDirectory();
+    const allowed = join(directory, "allowed");
+    const clientWorkspace = join(directory, "workspace");
+    await Promise.all([mkdir(allowed), mkdir(clientWorkspace)]);
+    const image = join(clientWorkspace, "photo.png");
+    await writeFile(image, "photo-data");
+    const canonicalWorkspace = await realpath(clientWorkspace);
+    const guard = createNodeInputGuard(
+      { allowedRoots: [await realpath(allowed)], maxImageBytes: 100 },
+      undefined,
+      () => [canonicalWorkspace],
+    );
+
+    await expect(
+      guard.readAuthorizedImage(image, new AbortController().signal),
+    ).resolves.toMatchObject({ ok: true, value: { originalBytes: 10 } });
+  });
+
+  it("rejects a path outside both configured and dynamic roots", async () => {
+    const directory = await temporaryDirectory();
+    const allowed = join(directory, "allowed");
+    const clientWorkspace = join(directory, "workspace");
+    const outside = join(directory, "outside");
+    await Promise.all([mkdir(allowed), mkdir(clientWorkspace), mkdir(outside)]);
+    const image = join(outside, "photo.png");
+    await writeFile(image, "photo-data");
+    const canonicalWorkspace = await realpath(clientWorkspace);
+    const guard = createNodeInputGuard(
+      { allowedRoots: [await realpath(allowed)], maxImageBytes: 100 },
+      undefined,
+      () => [canonicalWorkspace],
+    );
+
+    await expect(
+      guard.readAuthorizedImage(image, new AbortController().signal),
+    ).resolves.toMatchObject({ error: { code: "PATH_NOT_ALLOWED" }, ok: false });
+  });
+
+  it("still prompts when a path escapes every root and an authorizer is configured", async () => {
+    const directory = await temporaryDirectory();
+    const allowed = join(directory, "allowed");
+    const outside = join(directory, "outside");
+    await Promise.all([mkdir(allowed), mkdir(outside)]);
+    const image = join(outside, "photo.png");
+    await writeFile(image, "photo-data");
+    const authorizer = vi.fn<
+      (_path: string, _signal: AbortSignal) => Promise<OutsideRootAuthorization>
+    >(() => Promise.resolve("ALLOWED"));
+    const guard = createNodeInputGuard(
+      { allowedRoots: [await realpath(allowed)], maxImageBytes: 100 },
+      authorizer,
+      () => [],
+    );
+
+    await expect(
+      guard.readAuthorizedImage(image, new AbortController().signal),
+    ).resolves.toMatchObject({ ok: true, value: { originalBytes: 10 } });
+    expect(authorizer).toHaveBeenCalledOnce();
+  });
+
+  it("does not let a dynamic root authorize a symlink escape", async () => {
+    const directory = await temporaryDirectory();
+    const clientWorkspace = join(directory, "workspace");
+    const outside = join(directory, "outside");
+    await Promise.all([mkdir(clientWorkspace), mkdir(outside)]);
+    const secret = join(outside, "secret.png");
+    const link = join(clientWorkspace, "linked.png");
+    await writeFile(secret, "secret");
+    await symlink(secret, link);
+    const canonicalWorkspace = await realpath(clientWorkspace);
+    const guard = createNodeInputGuard(
+      { allowedRoots: [canonicalWorkspace], maxImageBytes: 100 },
+      undefined,
+      () => [canonicalWorkspace],
+    );
+
+    await expect(
+      guard.readAuthorizedImage(link, new AbortController().signal),
+    ).resolves.toMatchObject({ error: { code: "PATH_NOT_ALLOWED" }, ok: false });
+  });
 });
