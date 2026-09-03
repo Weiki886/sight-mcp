@@ -9,6 +9,10 @@
 本手册把可复现的准备工作与不可逆的 npm 发布、Git 打标签、GitHub
 Release 步骤分开。产物通过 Host 冒烟之后，任何发布操作者都不得重新构建 tarball。
 
+从 v0.2.0 起，npm 发布由 `.github/workflows/publish.yml` 在 GitHub
+Release 发布事件中自动执行。该工作流使用 npm Trusted Publisher（OIDC）生成 npm
+provenance，并发布 Release 附件中的同一份候选 tarball。维护者不应再在本地发布或关闭 provenance。
+
 ## 候选产物构建
 
 CI 的 `release-candidate` 作业在两个受支持 Node 版本的质量作业都通过之后，在 Node.js
@@ -54,7 +58,9 @@ SBOM。上传的产物只包含：
    首次发布时 registry 查询预期返回 `E404`，但必须由 `npm whoami` 与 scope 权限证明操作者控制
    `@weiki`。仅凭未认证状态下的 `E404` 不构成证据。
 
-9. npm 账号已开启 2FA 或配置了可信发布者。若使用 GitHub 可信发布，公开包与仓库的映射必须完全一致，npm 会据此生成包来源证明。
+9. npm 账号已开启 2FA，并配置 GitHub Trusted Publisher：组织/用户 `Weiki886`、仓库
+   `sight-mcp`、工作流文件
+   `.github/workflows/publish.yml`、Environment 留空。公开包与仓库的映射必须完全一致，npm 会据此生成包来源证明。
 10. 在复核完以上各项后，由人工显式批准 npm 发布、打标签和 GitHub Release。
 
 2026-08-31 准备阶段时，包在 registry 返回 `E404`，这台工作机未登录 npm，`@weiki`
@@ -66,7 +72,8 @@ Release；scope 归属现已由线上账号签名的包本身证明。
 
 1. 下载已完成证明的 `main` 候选产物；不要重新执行 `pnpm pack`。
 2. 重新计算 SHA-256 并核验 GitHub 来源证明。
-3. 通过已批准的 npm 身份/可信发布者路径发布这个确切的 `.tgz`。
+3. 创建 GitHub Release；`publish.yml` 会下载其附件并通过 npm Trusted Publisher 自动发布这个确切的
+   `.tgz`。
 4. 核验
    `npm view @weiki/sight-mcp@0.1.0 dist.integrity dist.tarball`，并做一次干净的 registry 安装加发现调用。
 5. 在清单所指的源码 commit 上创建已签名/已验证的 `v0.1.0` 标签。

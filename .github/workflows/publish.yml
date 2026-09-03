@@ -1,0 +1,88 @@
+name: Publish to npm
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish release artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Download the exact release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          case "$RELEASE_TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Release tag must be a semantic version: $RELEASE_TAG" >&2; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/sight-mcp-release"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'weiki-sight-mcp-*.tgz' \
+            --pattern 'release-manifest.json' \
+            --dir "$RUNNER_TEMP/sight-mcp-release"
+
+      - name: Verify immutable artifact metadata
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_DIR: ${{ runner.temp }}/sight-mcp-release
+        run: |
+          set -euo pipefail
+          expected_version="${RELEASE_TAG#v}"
+          archive="$RELEASE_DIR/weiki-sight-mcp-${expected_version}.tgz"
+          manifest="$RELEASE_DIR/release-manifest.json"
+          test -f "$archive"
+          test -f "$manifest"
+          node - "$expected_version" "$archive" "$manifest" <<'NODE'
+          const { readFileSync } = require("node:fs");
+          const { execFileSync } = require("node:child_process");
+          const [expectedVersion, archive, manifestPath] = process.argv.slice(2);
+          const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+          const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+          if (packageJson.version !== expectedVersion) {
+            throw new Error(`package.json version ${packageJson.version} does not match ${expectedVersion}`);
+          }
+          if (manifest.artifact?.version !== expectedVersion || manifest.artifact?.file !== `weiki-sight-mcp-${expectedVersion}.tgz`) {
+            throw new Error("Release manifest does not match the release tag");
+          }
+          const packed = JSON.parse(execFileSync("tar", ["-xOzf", archive, "package/package.json"], { encoding: "utf8" }));
+          if (packed.name !== packageJson.name || packed.version !== expectedVersion) {
+            throw new Error("Packed package metadata does not match the checked-out release tag");
+          }
+          NODE
+          node scripts/check-pack.mjs --archive "$archive"
+
+      - name: Publish with npm Trusted Publishing
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_DIR: ${{ runner.temp }}/sight-mcp-release
+        run: |
+          set -euo pipefail
+          npm publish "$RELEASE_DIR/weiki-sight-mcp-${RELEASE_TAG#v}.tgz" --provenance --access public
+          npm view "@weiki/sight-mcp@${RELEASE_TAG#v}" name version dist.integrity
