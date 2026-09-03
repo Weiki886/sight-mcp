@@ -351,6 +351,7 @@ scope and design can be agreed on before code.
 - [Threat model](docs/security/threat-model.en.md)
 - [OpenAI-compatible Provider](docs/providers/openai-compatible.en.md)
 - [Test and delivery strategy](docs/testing/strategy.en.md)
+- [v0.2.0 release notes](docs/release/v0.2.0.en.md)
 - [v0.1.0 release notes](docs/release/v0.1.0.en.md)
 
 ## License

@@ -1,6 +1,6 @@
 {
   "name": "@weiki/sight-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A secure MCP vision bridge for text-only coding agents.",
   "license": "MIT",
   "author": "Weiki886",

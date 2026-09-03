@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { PACKAGE_NAME, VERSION } from "../../src/version.js";
 
 describe("release metadata", () => {
-  it("keeps package and runtime identities aligned for v0.1.0", async () => {
+  it("keeps package and runtime identities aligned", async () => {
     const packageJson = JSON.parse(
       await readFile(new URL("../../package.json", import.meta.url), "utf8"),
     ) as {

@@ -326,6 +326,7 @@ request。除很小的修复外，请先开一个 issue，以便在写代码前�
 - [威胁模型](docs/security/threat-model.md)
 - [OpenAI 兼容 Provider](docs/providers/openai-compatible.md)
 - [测试与交付策略](docs/testing/strategy.md)
+- [v0.2.0 发布说明](docs/release/v0.2.0.md)
 - [v0.1.0 发布说明](docs/release/v0.1.0.md)
 
 ## 许可证
