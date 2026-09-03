@@ -148,6 +148,42 @@ On Windows, Node's platform delimiter is `;`:
 }
 ```
 
+### Client workspace root discovery
+
+When the connected MCP client advertises the `roots` capability (Claude Code does), Sight MCP
+requests the client's workspace roots once initialization completes and adopts them as allowed
+roots, so reads inside the workspace need no authorization dialog.
+
+- The request runs in the background with a 3-second timeout; every failure (capability absent,
+  protocol era unsupported, timeout) degrades silently and never blocks a tool call.
+- Only `file://` roots are accepted; other schemes are ignored.
+- Each path is canonicalized with `realpath` and must resolve to an existing directory.
+- The filesystem root `/` and the whole home directory are refused and reported as a warning rather
+  than adopted.
+- Nested roots collapse to the minimal equivalent set, matching `SIGHT_ALLOWED_ROOTS` behaviour.
+- A client may send `notifications/roots/list_changed` to have the server refresh the set.
+
+**Note:** `roots/list` is deprecated as of MCP revision 2026-07-28 (SEP-2577) and the SDK refuses to
+send it on that era. This feature is an optional enhancement, not the only way to avoid dialogs, and
+the server works normally when a client cannot serve it.
+
+### Session authorization cache
+
+When a path falls outside both the configured roots and the discovered client roots, Sight MCP shows
+the macOS authorization dialog. Once the user allows it, the **parent directory** of that path is
+recorded in an in-process cache, so other files in the same directory do not prompt again during the
+session.
+
+- The cache lives only in process memory and is cleared on restart — it is never written to disk.
+- Grants are directory-scoped: approving `~/Downloads/a.png` grants `~/Downloads` and never widens
+  to `~`.
+- The filesystem root `/` and the whole home directory are never cached, regardless of path depth.
+- A cancelled read (aborted signal) leaves no grant behind.
+- A denial is not cached; the next read of that path prompts again.
+
+This layer is protocol-independent and is the fallback that removes repeat dialogs when a client
+does not support root discovery.
+
 ## Startup behavior
 
 The server validates all configuration before connecting the MCP transport. Missing required values,
