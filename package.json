@@ -32,7 +32,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/mark-executable.mjs",
     "audit:prod": "pnpm audit --prod --audit-level high",
-    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:integration && pnpm pack:check && pnpm audit:prod && pnpm licenses:check && pnpm workflow:check",
+    "ci": "pnpm docs:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:integration && pnpm pack:check && pnpm audit:prod && pnpm licenses:check && pnpm workflow:check",
+    "docs:check": "node scripts/check-docs-links.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "licenses:check": "node scripts/check-licenses.mjs",

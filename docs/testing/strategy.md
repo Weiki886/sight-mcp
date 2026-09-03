@@ -184,6 +184,7 @@ Code 记录和一条 Codex 记录是以 `--provider`
 脚手架 Issue 应提供具备如下稳定语义的脚本：
 
 ```bash
+pnpm docs:check
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -195,6 +196,10 @@ pnpm audit:prod
 ```
 
 CI 调用与本地相同的脚本，而不是在工作流 YAML 中重复实现行为。
+
+`docs:check`
+负责守护双语文档结构。它要求每份 Markdown 都有且仅有一条语种切换链接指向自己的对应语种副本，要求正文中的相对链接在同一语种内闭环（中文文档链中文，英文
+`.en.md` 文档链 `.en.md`），并拒绝死链与绝对路径链接。代码块内的内容不参与检查。
 
 包测试与宿主示例必须使用脚手架 Issue 选定的 scoped 分发名。它们绝不能安装或调用无关的、未加 scope 的
 `sight-mcp` 包。
