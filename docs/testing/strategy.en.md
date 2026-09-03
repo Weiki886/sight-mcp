@@ -212,6 +212,7 @@ Do not rebuild a different tarball during release promotion.
 The scaffold Issue should provide scripts with these stable intentions:
 
 ```bash
+pnpm docs:check
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -223,6 +224,11 @@ pnpm audit:prod
 ```
 
 CI invokes the same scripts rather than duplicating behavior in workflow YAML.
+
+`docs:check` guards the bilingual documentation structure. It requires exactly one language switch
+link per Markdown document, pointing at that document's counterpart, keeps body-relative links
+inside one language (Chinese documents link Chinese, English `.en.md` documents link `.en.md`), and
+rejects dead links and absolute-path links. Fenced code blocks are not inspected.
 
 Package tests and host examples must use the scoped distribution name selected by the scaffold
 Issue. They must never install or invoke the unrelated unscoped `sight-mcp` package.
