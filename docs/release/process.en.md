@@ -12,6 +12,11 @@
 This runbook separates reproducible preparation from the irreversible npm publish, Git tag, and
 GitHub Release steps. No release operator may rebuild the tarball after it has passed Host smoke.
 
+Starting with v0.2.0, npm publication is automated by `.github/workflows/publish.yml` on a published
+GitHub Release event. The workflow uses npm Trusted Publishing (OIDC), generates npm provenance, and
+publishes the exact candidate tarball attached to the Release. Operators must not publish locally or
+disable provenance.
+
 ## Candidate construction
 
 The CI `release-candidate` job runs on Node.js 22 after both supported Node quality jobs pass. It
@@ -60,8 +65,10 @@ Before publication, the maintainer must verify all of the following against one 
    The expected first-release registry lookup is `E404`, but `npm whoami` and scope access must
    establish that the operator controls `@weiki`. An unauthenticated `E404` alone is not proof.
 
-9. The npm account has 2FA or a configured trusted publisher. For GitHub trusted publishing, the
-   public package and repository mapping must be exact and npm will generate package provenance.
+9. The npm account has 2FA enabled and GitHub Trusted Publishing configured: organization/user
+   `Weiki886`, repository `sight-mcp`, workflow filename `.github/workflows/publish.yml`, and no
+   Environment. The public package and repository mapping must be exact and npm will generate
+   package provenance.
 10. A human explicitly approves npm publish, Tag, and GitHub Release after reviewing these items.
 
 At preparation time on 2026-08-31, the package registry returned `E404`, this workstation was not
@@ -74,7 +81,8 @@ scope ownership is now proven by the live, account-signed package.
 
 1. Download the already-attested `main` candidate artifact; do not run `pnpm pack` again.
 2. Recalculate SHA-256 and verify GitHub provenance.
-3. Publish the exact `.tgz` through the approved npm identity/trusted-publisher path.
+3. Create the GitHub Release; `publish.yml` downloads its attachment and publishes the exact `.tgz`
+   through npm Trusted Publishing.
 4. Verify `npm view @weiki/sight-mcp@0.1.0 dist.integrity dist.tarball` and perform a clean registry
    install plus discovery call.
 5. Create signed/verified tag `v0.1.0` on the manifest source commit.
