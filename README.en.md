@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/Weiki886/sight-mcp/main/docs/logo.png" alt="Sight MCP" width="420">
+
 # Sight MCP
 
 **Give your text-only agent eyes.** A secure Model Context Protocol (MCP) vision bridge that adds
