@@ -36,7 +36,7 @@ endpoint.
 
 ```sh
 # 1. Save your provider key once (macOS Keychain; prompts interactively, never in shell history)
-npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.0 credentials set qwen
 
 # 2. Register the server with your host and pick a provider (see the snippets below).
 
@@ -53,9 +53,12 @@ image to the clipboard and call `analyze_clipboard_image(prompt)` without any pa
   network access granted to the model.
 - **Safe file access** — absolute-path validation against `SIGHT_ALLOWED_ROOTS`, canonicalization,
   and symlink-aware boundary checks before any bytes are read.
-- **One-time out-of-root authorization (macOS)** — when an `analyze_image` path falls outside
-  `SIGHT_ALLOWED_ROOTS`, a one-time native confirmation dialog is shown and the file is read only
-  after approval; refusing returns `PATH_ACCESS_DENIED`.
+- **Client workspace auto-adoption** — when the host advertises the `roots` capability (Claude Code
+  does), the server adopts the workspace roots as allowed roots, so in-workspace reads need no
+  confirmation; unsupported clients degrade silently.
+- **Session authorization cache (macOS)** — once an out-of-workspace path is approved in the native
+  dialog, its parent directory stays approved for the rest of the process; grants live in memory
+  only, never touch disk, expire on restart, and neither refusals nor cancellations are recorded.
 - **In-memory processing** — `analyze_image` makes no temporary copies; images are stripped of
   metadata, orientation-corrected, and resized without enlargement in RAM before transmission.
 - **One-click clipboard reading (macOS)** — `analyze_clipboard_image` asks for explicit native
@@ -67,7 +70,9 @@ image to the clipboard and call `analyze_clipboard_image(prompt)` without any pa
 - **Fail-closed and observable** — no silent provider/endpoint fallback, no redirect following,
   redacted structured logs, and stable error codes that never leak paths, keys, or raw bodies.
 - **Production-minded delivery** — TypeScript with strict lint/typecheck, unit/contract/security/
-  integration tests, package-content and license audits, and npm provenance attestation.
+  integration tests, package-content and license audits, and build provenance (CI attests the
+  candidate tarball with GitHub attestation; the Release-triggered npm publish generates npm
+  provenance through the Trusted Publisher).
 
 ## Installation
 
@@ -75,10 +80,10 @@ image to the clipboard and call `analyze_clipboard_image(prompt)` without any pa
 - An OpenAI-compatible endpoint with a vision-capable model (local or remote)
 - macOS for native Keychain storage; environment-based configuration remains portable
 
-After v0.1.0 is published, hosts should run the immutable scoped version:
+Hosts should run the immutable scoped version:
 
 ```sh
-npx -y @weiki/sight-mcp@0.1.0
+npx -y @weiki/sight-mcp@0.2.0
 ```
 
 The unrelated unscoped `sight-mcp` package is not this project. During release-candidate testing,
@@ -91,9 +96,9 @@ directly, so the key does not appear in the command, shell history, MCP host con
 repository `.env` file:
 
 ```sh
-npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
-npx -y @weiki/sight-mcp@0.1.0 credentials set deepseek
-npx -y @weiki/sight-mcp@0.1.0 credentials status
+npx -y @weiki/sight-mcp@0.2.0 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.0 credentials set deepseek
+npx -y @weiki/sight-mcp@0.2.0 credentials status
 ```
 
 Only configure the Provider you use. `credentials status [qwen|deepseek]` reports `configured` or
@@ -116,7 +121,7 @@ key:
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki/sight-mcp@0.1.0", "--provider", "qwen"],
+      "args": ["-y", "@weiki/sight-mcp@0.2.0", "--provider", "qwen"],
       "env": {
         "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images"
       }
@@ -139,7 +144,7 @@ Codex reads user configuration from `~/.codex/config.toml`; a trusted project ma
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki/sight-mcp@0.1.0", "--provider", "qwen"]
+args = ["-y", "@weiki/sight-mcp@0.2.0", "--provider", "qwen"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
@@ -159,9 +164,10 @@ analyze_image(path, prompt)
 analyze_clipboard_image(prompt)   (macOS only)
 ```
 
-- `path` must be an absolute path. Paths inside `SIGHT_ALLOWED_ROOTS` are read directly; on macOS,
-  paths outside the roots trigger a one-time native authorization dialog before they are read. For
-  images the user pasted directly, prefer `analyze_clipboard_image`.
+- `path` must be an absolute path. Paths inside `SIGHT_ALLOWED_ROOTS` or the client workspace roots
+  are read directly; out-of-workspace paths show a native confirmation dialog on macOS, and once
+  approved their parent directory stays prompt-free for the session; refusing returns
+  `PATH_ACCESS_DENIED`. For images the user pasted directly, prefer `analyze_clipboard_image`.
 - `prompt` is a non-empty question of at most 8,000 characters.
 - `analyze_clipboard_image` reads the image currently on the system clipboard after a native
   one-click confirmation dialog. It takes no path, so `SIGHT_ALLOWED_ROOTS` does not apply, and the
@@ -200,10 +206,12 @@ analyze_clipboard_image(prompt)   (macOS only)
 | `SIGHT_LOG_LEVEL`                   | `info`     | `silent`, `error`, `warn`, `info`, or `debug`                  |
 
 Allowed roots must already exist and are canonicalized at startup. Use `:` between roots on macOS
-and Linux, and `;` on Windows. Avoid broad roots such as an entire home directory. PNG, JPEG, and
-WebP are recognized from content rather than filename extension. Animated or unsupported formats are
-rejected. Images are orientation-corrected, stripped of metadata, resized without enlargement, and
-encoded as JPEG when opaque or PNG when transparency is required.
+and Linux, and `;` on Windows. Avoid broad roots such as an entire home directory. When the client
+advertises the `roots` capability, its workspace roots join the allowed set after initialization;
+over-broad workspace roots such as the filesystem root or an entire home directory are refused with
+a warning. PNG, JPEG, and WebP are recognized from content rather than filename extension. Animated
+or unsupported formats are rejected. Images are orientation-corrected, stripped of metadata, resized
+without enlargement, and encoded as JPEG when opaque or PNG when transparency is required.
 
 `*` `SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL` are required only in generic no-argument
 mode. A built-in `--provider` profile supplies both as one fixed pair.
@@ -303,7 +311,7 @@ hosts should avoid immediate unbounded retry loops.
 - **`CLIPBOARD_ACCESS_DENIED`:** the confirmation dialog was cancelled or denied. Retry the tool and
   choose Allow when it appears.
 - **`CLIPBOARD_NO_IMAGE`:** copy a PNG, JPEG, or WebP image to the clipboard first, then retry.
-- **`CLIPBOARD_UNAVAILABLE`:** clipboard reading is macOS-only in v0.1.0. Use `analyze_image` with a
+- **`CLIPBOARD_UNAVAILABLE`:** clipboard reading is currently macOS-only. Use `analyze_image` with a
   saved file on other platforms.
 - **Clipboard confirmation does not appear or `CLIPBOARD_READ_FAILED`:** confirm accessibility
   permissions (System Settings → Privacy & Security → Automation) let the host control the system
@@ -332,8 +340,9 @@ Provider-failure/cancellation scenarios, and generates a CycloneDX SBOM with `np
 those files as one artifact; a `main` run also creates GitHub build provenance for the exact `.tgz`.
 
 Additional release evidence and the manual Host matrix are documented in
-[the v0.1.0 release runbook](docs/release/process.en.md). Formal npm publish, Git tag, and GitHub
-Release remain separate human-approved steps.
+[the release runbook](docs/release/process.en.md). Git tags and GitHub Releases are created after
+human approval; once a Release is published, `publish.yml` publishes the same tarball to npm through
+the Trusted Publisher and generates npm provenance.
 
 ## Contributing
 

@@ -32,7 +32,7 @@ Sight MCP 提供两个只读图像工具：`analyze_image` 用于读取已授权
 
 ```sh
 # 1. 一次性保存你的 Provider 密钥（macOS Keychain；交互式输入，不会进入 shell 历史）
-npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.0 credentials set qwen
 
 # 2. 在你的宿主中注册服务并选择 Provider（见下方配置片段）。
 
@@ -48,8 +48,10 @@ npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
 - **只读设计** —— 仅两个职责单一的窄口径工具，不会把任意文件读取、shell 或网络访问能力交给模型。
 - **安全的文件访问** —— 读取前基于 `SIGHT_ALLOWED_ROOTS`
   做绝对路径校验、路径规范化，并对符号链接边界进行检查。
-- **工作区外一次性授权（macOS）** —— 当 `analyze_image` 的绝对路径位于 `SIGHT_ALLOWED_ROOTS`
-  之外时，会弹出一个一次性原生确认框，允许后才读取；拒绝则返回 `PATH_ACCESS_DENIED`。
+- **客户端工作区自动放行** —— 宿主声明 `roots` 能力时（Claude
+  Code即是），服务把工作区根目录并入允许集合，工作区内读图无需确认；客户端不支持时静默降级。
+- **会话内授权缓存（macOS）**
+  ——工作区外路径首次经原生确认框批准后，其父目录在本次进程内免弹窗；缓存只存内存、不落盘、重启失效，拒绝与取消都不留记录。
 - **纯内存处理** —— `analyze_image`
   不产生任何临时副本；图片在发送前于内存中移除元数据、校正方向、不做放大只做缩小。
 - **一键读取剪切板（macOS）** —— `analyze_clipboard_image`
@@ -61,8 +63,8 @@ npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
 - **失败即关闭、可观测**
   —— 不会静默切换 Provider/端点，不跟随重定向，日志为脱敏的结构化输出，并返回不会泄露路径、密钥或原始响应的稳定错误码。
 - **面向生产的交付** ——
-  TypeScript + 严格 lint/typecheck，单元/契约/安全/集成测试，包内容与许可证审计，以及 npm
-  provenance 证明。
+  TypeScript + 严格 lint/typecheck，单元/契约/安全/集成测试，包内容与许可证审计，以及构建来源证明（CI 对候选 tarball 生成 GitHub
+  attestation；Release 触发的 npm 发布经 Trusted Publisher 生成 npm provenance）。
 
 ## 安装
 
@@ -70,10 +72,10 @@ npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
 - 一个支持视觉模型的 OpenAI 兼容端点（本地或远程均可）
 - macOS 用于原生 Keychain 存储；基于环境变量的配置在其它平台也可用
 
-v0.1.0 发布后，宿主应运行固定版本的 scoped 包：
+宿主应运行固定版本的 scoped 包：
 
 ```sh
-npx -y @weiki/sight-mcp@0.1.0
+npx -y @weiki/sight-mcp@0.2.0
 ```
 
 无关的未加 scope 的 `sight-mcp` 包不是本项目。在做 release-candidate 测试时，请安装并使用生成的
@@ -86,9 +88,9 @@ Keychain 中保存一次。系统命令会直接以交互方式索要密钥，�
 `.env` 文件中：
 
 ```sh
-npx -y @weiki/sight-mcp@0.1.0 credentials set qwen
-npx -y @weiki/sight-mcp@0.1.0 credentials set deepseek
-npx -y @weiki/sight-mcp@0.1.0 credentials status
+npx -y @weiki/sight-mcp@0.2.0 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.0 credentials set deepseek
+npx -y @weiki/sight-mcp@0.2.0 credentials status
 ```
 
 只配置你真正使用的 Provider。`credentials status [qwen|deepseek]` 会报告 `configured` 或
@@ -110,7 +112,7 @@ Claude Code 支持在 local、project、user 三种作用域下运行本地 stdi
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki/sight-mcp@0.1.0", "--provider", "qwen"],
+      "args": ["-y", "@weiki/sight-mcp@0.2.0", "--provider", "qwen"],
       "env": {
         "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images"
       }
@@ -132,7 +134,7 @@ Codex 从 `~/.codex/config.toml` 读取用户配置；可信项目也可以改�
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki/sight-mcp@0.1.0", "--provider", "qwen"]
+args = ["-y", "@weiki/sight-mcp@0.2.0", "--provider", "qwen"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
@@ -152,8 +154,8 @@ analyze_clipboard_image(prompt)   (仅 macOS)
 ```
 
 - `path` 必须是绝对路径。位于 `SIGHT_ALLOWED_ROOTS`
-  之内的路径会被直接读取；在 macOS 上，位于工作区之外的路径会先弹出一个一次性原生授权框，允许后才读取。用户直接粘贴的图片请改用
-  `analyze_clipboard_image`。
+  或客户端工作区根目录之内的路径会被直接读取；工作区外路径在 macOS 上先弹出原生确认框，批准后其父目录在会话内免弹窗，拒绝则返回
+  `PATH_ACCESS_DENIED`。用户直接粘贴的图片请改用 `analyze_clipboard_image`。
 - `prompt` 是一个非空问题，最多 8,000 个字符。
 - `analyze_clipboard_image`
   在弹出一个原生的一键确认对话框后读取系统剪切板当前图片。它不接受路径，因此 `SIGHT_ALLOWED_ROOTS`
@@ -191,7 +193,8 @@ analyze_clipboard_image(prompt)   (仅 macOS)
 | `SIGHT_LOG_LEVEL`                   | `info`       | `silent`、`error`、`warn`、`info` 或 `debug`             |
 
 允许的根目录必须已经存在，并在启动时进行规范化。macOS 与 Linux 上多个根目录用 `:` 分隔，Windows上用
-`;`。避免使用整个 home 目录这类过于宽泛的根目录。PNG、JPEG、WebP 依据内容而不是文件扩展名识别。动图或不受支持的格式会被拒绝。图片会被校正方向、移除元数据、不做放大地缩放，并在不透明时编码为 JPEG、需要透明时编码为 PNG。
+`;`。避免使用整个 home 目录这类过于宽泛的根目录。客户端声明 `roots`
+能力时，其工作区根目录会在初始化后自动并入允许集合；文件系统根或整个 home 目录这类过宽的工作区根会被拒绝并告警。PNG、JPEG、WebP 依据内容而不是文件扩展名识别。动图或不受支持的格式会被拒绝。图片会被校正方向、移除元数据、不做放大地缩放，并在不透明时编码为 JPEG、需要透明时编码为 PNG。
 
 `*` `SIGHT_PROVIDER_BASE_URL` 与 `SIGHT_PROVIDER_MODEL` 仅在通用无参数模式下才必需。内置的
 `--provider` profile 会把两者作为一组固定参数提供。
@@ -280,7 +283,7 @@ Sight MCP 从不跟随重定向，也从不静默切换端点。它只对连接�
 - **`PATH_ACCESS_DENIED`：** macOS 上弹出的授权框被拒绝或取消。重试该工具，并在弹出时选择允许。
 - **`CLIPBOARD_ACCESS_DENIED`：** 确认对话框被取消或拒绝。重试该工具，并在弹出时选择允许。
 - **`CLIPBOARD_NO_IMAGE`：** 先把 PNG、JPEG 或 WebP 图片复制到剪切板，然后重试。
-- **`CLIPBOARD_UNAVAILABLE`：** v0.1.0 中剪切板读取仅限 macOS。在其它平台上改用 `analyze_image`
+- **`CLIPBOARD_UNAVAILABLE`：** 剪切板读取目前仅限 macOS。在其它平台上改用 `analyze_image`
   读取已保存的文件。
 - **没有出现剪切板确认框或返回 `CLIPBOARD_READ_FAILED`：**
   确认辅助功能权限（系统设置 → 隐私与安全性 → 自动化）允许宿主控制系统对话框，然后重试。
@@ -307,8 +310,9 @@ pnpm release:candidate -- --output artifacts/release-candidate
 `npm sbom` 生成 CycloneDX SBOM。CI 会把这些文件作为一个 artifact 上传；`main` 分支的运行还会为精确的
 `.tgz` 生成 GitHub 构建 provenance。
 
-更多发布证据与手动宿主矩阵见 [v0.1.0 发布 runbook](docs/release/process.md)。正式的 npm 发布、Git
-tag 与 GitHub Release 仍是单独的人工批准步骤。
+更多发布证据与手动宿主矩阵见 [发布 runbook](docs/release/process.md)。Git tag 与 GitHub
+Release 由人工批准后创建；Release 发布后，publish.yml 经 npm Trusted
+Publisher 自动发布同一份 tarball 并生成 npm provenance。
 
 ## 贡献
 
