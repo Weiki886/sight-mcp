@@ -1,0 +1,49 @@
+name: Bug 报告
+description: 报告一个可以复现的问题
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 发生了什么？预期行为是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 配置……
+        2. 调用……
+        3. 观察到……
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: sight-mcp 版本
+      placeholder: 例如 0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: MCP 宿主
+      options:
+        - Claude Code
+        - Codex
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+      placeholder: 例如 macOS 15.3 / Node.js 24
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志与错误码
+      description: 请脱敏后再粘贴，不要包含 API Key、图片内容或其他隐私数据。
