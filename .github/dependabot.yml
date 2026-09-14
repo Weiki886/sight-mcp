@@ -11,6 +11,17 @@ updates:
     groups:
       development-dependencies:
         dependency-type: development
+        # Group only safe updates; majors arrive as individual PRs so one
+        # incompatible major cannot block the whole batch (see PR #50).
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # typescript-eslint does not support TS 7 yet; revisit once upstream
+      # support lands (typescript-eslint/typescript-eslint#10940).
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
   - package-ecosystem: github-actions
     directory: /
     schedule:
