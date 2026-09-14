@@ -78,7 +78,7 @@ Release；scope 归属现已由线上账号签名的包本身证明。
    `npm view @weiki/sight-mcp@0.1.0 dist.integrity dist.tarball`，并做一次干净的 registry 安装加发现调用。
 5. 在清单所指的源码 commit 上创建已签名/已验证的 `v0.1.0` 标签。
 6. 基于该标签、使用[已准备好的发布说明](v0.1.0.md)创建 GitHub
-   Release，附上完全相同的 tarball、清单、SBOM 和校验说明，然后逐一检查所有公开链接。
+   Release，附上完全相同的 tarball、清单、SBOM 和校验说明，然后逐一检查所有公开链接。注意：发布说明正文里的相对链接（含语种切换行）在 Release 页面会按仓库根目录解析而失效；填入 Release 正文前，必须把它们改写为指向该标签的绝对 URL。
 7. 只有在 npm、GitHub Release 与发布后冒烟全部成功之后，才关闭 Issue #6 与里程碑。
 
 本项目遵循 npm 的[可信发布指南](https://docs.npmjs.com/trusted-publishers/)以及 GitHub 的[产物证明指南](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)。

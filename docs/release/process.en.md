@@ -87,7 +87,10 @@ scope ownership is now proven by the live, account-signed package.
    install plus discovery call.
 5. Create signed/verified tag `v0.1.0` on the manifest source commit.
 6. Create the GitHub Release from that tag using [the prepared notes](v0.1.0.en.md), attach the
-   exact tarball, manifest, SBOM, and verification instructions, then check every public link.
+   exact tarball, manifest, SBOM, and verification instructions, then check every public link. Note:
+   relative links in the notes body (including the language switch line) resolve against the
+   repository root on Release pages and break; rewrite them as absolute tag-pinned URLs before
+   publishing.
 7. Close Issue #6 and the milestone only after npm, GitHub Release, and post-publish smoke succeed.
 
 The project follows npm's [trusted publishing guidance](https://docs.npmjs.com/trusted-publishers/)
