@@ -32,7 +32,7 @@ Sight MCP 提供两个只读图像工具：`analyze_image` 用于读取已授权
 
 ```sh
 # 1. 一次性保存你的 Provider 密钥（macOS Keychain；交互式输入，不会进入 shell 历史）
-npx -y @weiki/sight-mcp@0.2.0 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.1 credentials set qwen
 
 # 2. 在你的宿主中注册服务并选择 Provider（见下方配置片段）。
 
@@ -75,7 +75,7 @@ npx -y @weiki/sight-mcp@0.2.0 credentials set qwen
 宿主应运行固定版本的 scoped 包：
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.0
+npx -y @weiki/sight-mcp@0.2.1
 ```
 
 无关的未加 scope 的 `sight-mcp` 包不是本项目。在做 release-candidate 测试时，请安装并使用生成的
@@ -88,9 +88,9 @@ Keychain 中保存一次。系统命令会直接以交互方式索要密钥，�
 `.env` 文件中：
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.0 credentials set qwen
-npx -y @weiki/sight-mcp@0.2.0 credentials set deepseek
-npx -y @weiki/sight-mcp@0.2.0 credentials status
+npx -y @weiki/sight-mcp@0.2.1 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.1 credentials set deepseek
+npx -y @weiki/sight-mcp@0.2.1 credentials status
 ```
 
 只配置你真正使用的 Provider。`credentials status [qwen|deepseek]` 会报告 `configured` 或
@@ -112,7 +112,7 @@ Claude Code 支持在 local、project、user 三种作用域下运行本地 stdi
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki/sight-mcp@0.2.0", "--provider", "qwen"],
+      "args": ["-y", "@weiki/sight-mcp@0.2.1", "--provider", "qwen"],
       "env": {
         "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images"
       }
@@ -134,7 +134,7 @@ Codex 从 `~/.codex/config.toml` 读取用户配置；可信项目也可以改�
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki/sight-mcp@0.2.0", "--provider", "qwen"]
+args = ["-y", "@weiki/sight-mcp@0.2.1", "--provider", "qwen"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
