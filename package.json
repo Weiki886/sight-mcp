@@ -2,6 +2,18 @@
   "name": "@weiki/sight-mcp",
   "version": "0.2.0",
   "description": "A secure MCP vision bridge for text-only coding agents.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "vision",
+    "image-analysis",
+    "ocr",
+    "claude-code",
+    "codex",
+    "llm",
+    "screenshot"
+  ],
   "license": "MIT",
   "author": "Weiki886",
   "type": "module",
