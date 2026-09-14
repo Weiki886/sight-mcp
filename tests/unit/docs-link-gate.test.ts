@@ -18,6 +18,37 @@ const chineseReadme = [
   "",
 ];
 const englishReadme = ["# Sight MCP", "", "**语言 / Language：** [中文](README.md) · English", ""];
+const chineseSecurity = [
+  "# 安全政策",
+  "",
+  "**语言 / Language：** 中文 · [English](SECURITY.en.md)",
+  "",
+];
+const englishSecurity = [
+  "# Security Policy",
+  "",
+  "**语言 / Language：** [中文](SECURITY.md) · English",
+  "",
+];
+const chineseContributing = [
+  "# 贡献指南",
+  "",
+  "**语言 / Language：** 中文 · [English](CONTRIBUTING.en.md)",
+  "",
+];
+const englishContributing = [
+  "# Contributing",
+  "",
+  "**语言 / Language：** [中文](CONTRIBUTING.md) · English",
+  "",
+];
+
+const defaultGovernanceDocuments: Readonly<Record<string, readonly string[]>> = {
+  "SECURITY.md": chineseSecurity,
+  "SECURITY.en.md": englishSecurity,
+  "CONTRIBUTING.md": chineseContributing,
+  "CONTRIBUTING.en.md": englishContributing,
+};
 
 interface GateResult {
   readonly code: number;
@@ -36,7 +67,7 @@ async function createFixture(
   await mkdir(path.join(root, "scripts"), { recursive: true });
   await writeFile(path.join(root, "scripts", "check-docs-links.mjs"), await readFile(gateScript));
 
-  for (const [relative, lines] of Object.entries(documents)) {
+  for (const [relative, lines] of Object.entries({ ...defaultGovernanceDocuments, ...documents })) {
     const absolute = path.join(root, relative);
     await mkdir(path.dirname(absolute), { recursive: true });
     await writeFile(absolute, `${lines.join("\n")}\n`);
@@ -91,7 +122,7 @@ describe("documentation link gate", () => {
     const result = await runGate(root);
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("Documentation links verified (6 documents");
+    expect(result.stdout).toContain("Documentation links verified (10 documents");
   });
 
   it("rejects a switch link that points at its own language", async () => {

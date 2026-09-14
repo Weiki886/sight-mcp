@@ -1,0 +1,28 @@
+name: 功能建议
+description: 提议一项新能力或改进
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 遇到什么场景？现在的痛点是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的方案
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: 非目标与边界
+      description: 哪些事情明确不做？
+  - type: textarea
+    id: risks
+    attributes:
+      label: 风险与兼容性考虑
+      description: 是否涉及安全边界、凭据、Provider 兼容或破坏性变更？

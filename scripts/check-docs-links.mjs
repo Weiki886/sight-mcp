@@ -5,7 +5,14 @@ import { fileURLToPath, URL } from "node:url";
 
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 const documentationDirectory = "docs";
-const rootDocuments = ["README.md", "README.en.md"];
+const rootDocuments = [
+  "README.md",
+  "README.en.md",
+  "SECURITY.md",
+  "SECURITY.en.md",
+  "CONTRIBUTING.md",
+  "CONTRIBUTING.en.md",
+];
 const englishSuffix = ".en.md";
 const switchMarker = "语言 / Language";
 const skippedLinkPrefixes = ["http://", "https://", "mailto:", "#"];
