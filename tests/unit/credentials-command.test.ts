@@ -14,27 +14,34 @@ function credentialStore(overrides: Partial<CredentialStore> = {}): CredentialSt
 }
 
 describe("credentials command", () => {
-  it("sets a selected credential without receiving its value", async () => {
+  it("sets a named credential without receiving its value", async () => {
     const store = credentialStore();
     const output: string[] = [];
     await expect(
-      runCredentialsCommand({ action: "set", kind: "credentials", provider: "qwen" }, store, {
+      runCredentialsCommand({ account: "my-provider", action: "set", kind: "credentials" }, store, {
         writeOutput: (message) => output.push(message),
       }),
     ).resolves.toBe(0);
-    expect(store.setInteractively).toHaveBeenCalledWith("qwen");
-    expect(output).toEqual(["qwen: configured"]);
+    expect(store.setInteractively).toHaveBeenCalledWith("my-provider");
+    expect(output).toEqual(["my-provider: configured"]);
   });
 
-  it("reports status for both profiles without reading either secret", async () => {
+  it("reports the named account status without reading its secret", async () => {
     const store = credentialStore({
-      has: vi.fn((provider) => Promise.resolve(provider === "qwen")),
+      has: vi.fn((account) => Promise.resolve(account === "configured-account")),
     });
     const output: string[] = [];
-    await runCredentialsCommand({ action: "status", kind: "credentials" }, store, {
-      writeOutput: (message) => output.push(message),
-    });
-    expect(output).toEqual(["qwen: configured", "deepseek: missing"]);
+    await runCredentialsCommand(
+      { account: "configured-account", action: "status", kind: "credentials" },
+      store,
+      { writeOutput: (message) => output.push(message) },
+    );
+    await runCredentialsCommand(
+      { account: "other-account", action: "status", kind: "credentials" },
+      store,
+      { writeOutput: (message) => output.push(message) },
+    );
+    expect(output).toEqual(["configured-account: configured", "other-account: missing"]);
     expect(store.get).not.toHaveBeenCalled();
   });
 
@@ -43,7 +50,7 @@ describe("credentials command", () => {
     const errors: string[] = [];
     await expect(
       runCredentialsCommand(
-        { action: "delete", assumeYes: false, kind: "credentials", provider: "deepseek" },
+        { account: "my-provider", action: "delete", assumeYes: false, kind: "credentials" },
         store,
         {
           confirmDelete: () => Promise.resolve(false),
@@ -57,18 +64,18 @@ describe("credentials command", () => {
     ]);
   });
 
-  it("deletes only the selected account after explicit confirmation", async () => {
+  it("deletes only the named account after explicit confirmation", async () => {
     const store = credentialStore();
     const output: string[] = [];
     await expect(
       runCredentialsCommand(
-        { action: "delete", assumeYes: true, kind: "credentials", provider: "qwen" },
+        { account: "my-provider", action: "delete", assumeYes: true, kind: "credentials" },
         store,
         { writeOutput: (message) => output.push(message) },
       ),
     ).resolves.toBe(0);
     expect(store.delete).toHaveBeenCalledTimes(1);
-    expect(store.delete).toHaveBeenCalledWith("qwen");
-    expect(output).toEqual(["qwen: deleted"]);
+    expect(store.delete).toHaveBeenCalledWith("my-provider");
+    expect(output).toEqual(["my-provider: deleted"]);
   });
 });

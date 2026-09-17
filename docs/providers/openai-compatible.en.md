@@ -6,7 +6,7 @@
 - Adapter name: `openai-compatible`
 - Operation: `{SIGHT_PROVIDER_BASE_URL}/chat/completions`
 - Formats transmitted: normalized JPEG or PNG data URL
-- Built-in profiles: `qwen`, `deepseek` (Issue #16)
+- Provider configuration: entirely environment-driven (Issue #63); no bundled models
 
 ## Compatibility contract
 
@@ -37,21 +37,19 @@ does not use vendor-specific response fields or an OpenAI SDK, keeping the domai
 - There is no fallback endpoint, automatic Provider switching, proxy discovery, or URL supplied by
   model/tool input.
 
-## Built-in profiles and live-test targets
+## Configuration example
 
-The built-in profiles and live-test targets are:
+The adapter bundles no Provider address or model; the endpoint and model come entirely from
+`SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL`. One live-tested configuration example:
 
-| Profile    | Role               | Base URL                                            | Model                          | Default effort |
-| ---------- | ------------------ | --------------------------------------------------- | ------------------------------ | -------------- |
-| `qwen`     | Primary            | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash`                | `low`          |
-| `deepseek` | Manual alternative | `https://api.deepseek.com`                          | `deepseek-v4-flash-vision-exp` | `low`          |
+| Base URL                                            | Model           | Suggested effort |
+| --------------------------------------------------- | --------------- | ---------------- |
+| `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash` | `low`            |
 
-On macOS, `--provider` reads the matching Keychain account after the documented environment
-overrides. On other platforms, use `SIGHT_QWEN_API_KEY` or `SIGHT_DEEPSEEK_API_KEY`; the generic
-`SIGHT_PROVIDER_API_KEY` is the highest-precedence explicit override. Switching is an explicit
-restart-time argument change. Sight MCP never transmits an image to a second Provider after an
-error. The DeepSeek target is experimental and must not be treated as a stable compatibility
-guarantee until the release validation matrix passes.
+The API key resolves with the documented precedence: the `SIGHT_PROVIDER_API_KEY` environment
+variable first, then the macOS Keychain account named by `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`.
+Switching Provider is an explicit environment change plus a host restart. After a failure, Sight MCP
+never sends an image to a second Provider.
 
 ## Bounds and retries
 

@@ -12,11 +12,6 @@ import {
 import { z } from "zod";
 
 import type { CredentialReader } from "./credentials/credential-store.js";
-import {
-  providerProfile,
-  type ProviderProfile,
-  type ProviderProfileName,
-} from "./provider-profiles.js";
 
 export const logLevels = ["silent", "error", "warn", "info", "debug"] as const;
 export const providerReasoningEfforts = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -96,7 +91,6 @@ export interface ConfigLoadOptions {
   readonly credentialReader?: CredentialReader;
   readonly cwd?: string;
   readonly pathDelimiter?: string;
-  readonly providerProfile?: ProviderProfileName;
 }
 
 export class ConfigError extends Error {
@@ -134,6 +128,10 @@ const environmentSchema = z.object({
   SIGHT_MAX_RETRIES: integerString(providerConfigDefaults.maxRetries, 0, 5),
   SIGHT_PROVIDER_API_KEY: z.string().optional(),
   SIGHT_PROVIDER_BASE_URL: z.string(),
+  SIGHT_PROVIDER_KEYCHAIN_ACCOUNT: z
+    .string()
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/u)
+    .optional(),
   SIGHT_PROVIDER_MAX_TOKENS: integerString(providerConfigDefaults.maxTokens, 1, 32_768),
   SIGHT_PROVIDER_MODEL: z.string().min(1).max(256),
   SIGHT_PROVIDER_REASONING_EFFORT: z.enum(providerReasoningEfforts).optional(),
@@ -230,33 +228,20 @@ function providerApiKey(
   return createProviderApiKey(value);
 }
 
-async function profileApiKey(
-  environment: Readonly<Record<string, string | undefined>>,
-  profile: ProviderProfile,
-  genericValue: string | undefined,
+async function keychainAccountApiKey(
+  account: string,
   credentialReader: CredentialReader | undefined,
 ): Promise<ProviderApiKey> {
-  const generic = providerApiKey(genericValue);
-  if (generic !== undefined) {
-    return generic;
-  }
-
-  const profileValue = environment[profile.apiKeyEnvironmentVariable];
-  const profileEnvironmentKey = providerApiKey(profileValue, profile.apiKeyEnvironmentVariable);
-  if (profileEnvironmentKey !== undefined) {
-    return profileEnvironmentKey;
-  }
-
   let storedValue: string | undefined;
   try {
-    storedValue = await credentialReader?.get(profile.keychainAccount);
+    storedValue = await credentialReader?.get(account);
   } catch {
     throw new ConfigError("macOS Keychain credential lookup failed.");
   }
   const storedKey = providerApiKey(storedValue, "macOS Keychain credential");
   if (storedKey === undefined) {
     throw new ConfigError(
-      `${profile.name} provider credential is not configured. Run sight-mcp credentials set ${profile.name}.`,
+      `Provider credential is not configured for account ${account}. Run sight-mcp credentials set ${account}.`,
     );
   }
   return storedKey;
@@ -370,8 +355,6 @@ export async function loadConfig(
   environment: Readonly<Record<string, string | undefined>> = process.env,
   options: ConfigLoadOptions = {},
 ): Promise<AppConfig> {
-  const selectedProfile =
-    options.providerProfile === undefined ? undefined : providerProfile(options.providerProfile);
   const result = environmentSchema.safeParse({
     SIGHT_ALLOWED_ROOTS: environment["SIGHT_ALLOWED_ROOTS"],
     SIGHT_JPEG_QUALITY: environment["SIGHT_JPEG_QUALITY"],
@@ -386,11 +369,11 @@ export async function loadConfig(
     SIGHT_MAX_RETRIES: environment["SIGHT_MAX_RETRIES"],
     SIGHT_MAX_TRANSMIT_BYTES: environment["SIGHT_MAX_TRANSMIT_BYTES"],
     SIGHT_PROVIDER_API_KEY: environment["SIGHT_PROVIDER_API_KEY"],
-    SIGHT_PROVIDER_BASE_URL: selectedProfile?.baseUrl ?? environment["SIGHT_PROVIDER_BASE_URL"],
+    SIGHT_PROVIDER_BASE_URL: environment["SIGHT_PROVIDER_BASE_URL"],
+    SIGHT_PROVIDER_KEYCHAIN_ACCOUNT: environment["SIGHT_PROVIDER_KEYCHAIN_ACCOUNT"],
     SIGHT_PROVIDER_MAX_TOKENS: environment["SIGHT_PROVIDER_MAX_TOKENS"],
-    SIGHT_PROVIDER_MODEL: selectedProfile?.model ?? environment["SIGHT_PROVIDER_MODEL"],
-    SIGHT_PROVIDER_REASONING_EFFORT:
-      environment["SIGHT_PROVIDER_REASONING_EFFORT"] ?? selectedProfile?.reasoningEffort,
+    SIGHT_PROVIDER_MODEL: environment["SIGHT_PROVIDER_MODEL"],
+    SIGHT_PROVIDER_REASONING_EFFORT: environment["SIGHT_PROVIDER_REASONING_EFFORT"],
     SIGHT_REQUEST_TIMEOUT_MS: environment["SIGHT_REQUEST_TIMEOUT_MS"],
     SIGHT_TRANSMIT_MAX_DIMENSION: environment["SIGHT_TRANSMIT_MAX_DIMENSION"],
   });
@@ -445,15 +428,13 @@ export async function loadConfig(
   });
   const execution: ExecutionConfig = Object.freeze({ maxConcurrency, maxQueueSize });
   const providerUrls = normalizeProviderUrls(result.data.SIGHT_PROVIDER_BASE_URL);
+  const environmentKey = providerApiKey(result.data.SIGHT_PROVIDER_API_KEY);
+  const keychainAccount = result.data.SIGHT_PROVIDER_KEYCHAIN_ACCOUNT;
   const apiKey =
-    selectedProfile === undefined
-      ? providerApiKey(result.data.SIGHT_PROVIDER_API_KEY)
-      : await profileApiKey(
-          environment,
-          selectedProfile,
-          result.data.SIGHT_PROVIDER_API_KEY,
-          options.credentialReader,
-        );
+    environmentKey ??
+    (keychainAccount === undefined
+      ? undefined
+      : await keychainAccountApiKey(keychainAccount, options.credentialReader));
   const provider: ProviderConfig = Object.freeze({
     ...(apiKey === undefined ? {} : { apiKey }),
     ...providerUrls,

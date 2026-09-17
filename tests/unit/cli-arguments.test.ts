@@ -7,42 +7,55 @@ describe("parseCliArguments", () => {
     expect(parseCliArguments([])).toEqual({ kind: "serve" });
   });
 
-  it.each(["qwen", "deepseek"] as const)("selects provider profile %s", (provider) => {
-    expect(parseCliArguments(["--provider", provider])).toEqual({ kind: "serve", provider });
-  });
-
-  it("parses credential management commands", () => {
-    expect(parseCliArguments(["credentials", "set", "qwen"])).toEqual({
+  it("parses credential management commands with arbitrary account names", () => {
+    expect(parseCliArguments(["credentials", "set", "my-provider"])).toEqual({
+      account: "my-provider",
       action: "set",
       kind: "credentials",
-      provider: "qwen",
     });
-    expect(parseCliArguments(["credentials", "status"])).toEqual({
+    expect(parseCliArguments(["credentials", "status", "team.qwen_prod"])).toEqual({
+      account: "team.qwen_prod",
       action: "status",
       kind: "credentials",
     });
-    expect(parseCliArguments(["credentials", "status", "deepseek"])).toEqual({
-      action: "status",
-      kind: "credentials",
-      provider: "deepseek",
-    });
-    expect(parseCliArguments(["credentials", "delete", "qwen", "--yes"])).toEqual({
+    expect(parseCliArguments(["credentials", "delete", "provider@work", "--yes"])).toEqual({
+      account: "provider@work",
       action: "delete",
       assumeYes: true,
       kind: "credentials",
-      provider: "qwen",
     });
+    expect(parseCliArguments(["credentials", "delete", "my-provider"])).toEqual({
+      account: "my-provider",
+      action: "delete",
+      assumeYes: false,
+      kind: "credentials",
+    });
+  });
+
+  it("fails the removed --provider flag with a migration message", () => {
+    let received: unknown;
+    try {
+      parseCliArguments(["--provider", "qwen"]);
+    } catch (error: unknown) {
+      received = error;
+    }
+    expect(received).toBeInstanceOf(CliUsageError);
+    expect(String(received)).toContain("--provider");
+    expect(String(received)).toContain("SIGHT_PROVIDER_BASE_URL");
+    expect(String(received)).toContain("SIGHT_PROVIDER_MODEL");
   });
 
   it.each([
     ["--provider"],
-    ["--provider", "private-invalid-provider"],
-    ["--provider", "qwen", "extra"],
+    ["--unknown"],
     ["credentials"],
     ["credentials", "set"],
-    ["credentials", "set", "invalid"],
-    ["credentials", "delete", "qwen", "--force"],
-    ["credentials", "status", "qwen", "extra"],
+    ["credentials", "status"],
+    ["credentials", "delete", "my-provider", "--force"],
+    ["credentials", "status", "my-provider", "extra"],
+    ["credentials", "set", "private invalid account"],
+    ["credentials", "set", "-leading-dash"],
+    ["credentials", "set", `a${"b".repeat(64)}`],
   ])("rejects invalid arguments without echoing them: %s", (...argumentsValue) => {
     let received: unknown;
     try {
@@ -51,6 +64,7 @@ describe("parseCliArguments", () => {
       received = error;
     }
     expect(received).toBeInstanceOf(CliUsageError);
-    expect(String(received)).not.toContain("private-invalid-provider");
+    expect(String(received)).not.toContain("private invalid account");
+    expect(String(received)).not.toContain("-leading-dash");
   });
 });

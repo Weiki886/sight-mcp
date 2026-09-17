@@ -16,9 +16,9 @@ describe("macOS Keychain credential store", () => {
     const run = runner(0, "private-key-canary\n");
     const store = createMacOSKeychainStore({ platform: "darwin", run });
 
-    await expect(store.get("qwen")).resolves.toBe("private-key-canary");
+    await expect(store.get("my-account")).resolves.toBe("private-key-canary");
     expect(run).toHaveBeenCalledWith(
-      ["find-generic-password", "-a", "qwen", "-s", keychainService, "-w"],
+      ["find-generic-password", "-a", "my-account", "-s", keychainService, "-w"],
       { captureStdout: true, inheritStdio: false },
     );
   });
@@ -28,8 +28,8 @@ describe("macOS Keychain credential store", () => {
     const service = "dev.weiki886.sight-mcp.test.canary";
     const store = createMacOSKeychainStore({ platform: "darwin", run, service });
 
-    await store.has("qwen");
-    expect(run).toHaveBeenCalledWith(["find-generic-password", "-a", "qwen", "-s", service], {
+    await store.has("my-account");
+    expect(run).toHaveBeenCalledWith(["find-generic-password", "-a", "my-account", "-s", service], {
       captureStdout: false,
       inheritStdio: false,
     });
@@ -39,9 +39,9 @@ describe("macOS Keychain credential store", () => {
     const run = runner();
     const store = createMacOSKeychainStore({ platform: "darwin", run });
 
-    await expect(store.has("deepseek")).resolves.toBe(true);
+    await expect(store.has("other-account")).resolves.toBe(true);
     expect(run).toHaveBeenCalledWith(
-      ["find-generic-password", "-a", "deepseek", "-s", keychainService],
+      ["find-generic-password", "-a", "other-account", "-s", keychainService],
       { captureStdout: false, inheritStdio: false },
     );
   });
@@ -55,7 +55,7 @@ describe("macOS Keychain credential store", () => {
       run,
     });
 
-    await store.setInteractively("qwen");
+    await store.setInteractively("my-account");
     const argumentsValue = vi.mocked(run).mock.calls[0]?.[0];
     expect(argumentsValue?.at(-1)).toBe("-w");
     expect(argumentsValue).not.toContain("private-key-canary");
@@ -74,7 +74,7 @@ describe("macOS Keychain credential store", () => {
       run,
     });
 
-    await expect(store.setInteractively("qwen")).rejects.toMatchObject({
+    await expect(store.setInteractively("my-account")).rejects.toMatchObject({
       code: "CREDENTIAL_INTERACTIVE_REQUIRED",
     });
     expect(run).not.toHaveBeenCalled();
@@ -84,20 +84,20 @@ describe("macOS Keychain credential store", () => {
     const run = runner(44, "private-output-that-must-be-discarded");
     const store = createMacOSKeychainStore({ platform: "darwin", run });
 
-    await expect(store.get("qwen")).resolves.toBeUndefined();
-    await expect(store.has("qwen")).resolves.toBe(false);
-    await expect(store.delete("qwen")).resolves.toBe(false);
+    await expect(store.get("my-account")).resolves.toBeUndefined();
+    await expect(store.has("my-account")).resolves.toBe(false);
+    await expect(store.delete("my-account")).resolves.toBe(false);
   });
 
   it("fails closed on unsupported platforms and command failures", async () => {
     const unavailable = createMacOSKeychainStore({ platform: "linux", run: runner() });
-    await expect(unavailable.get("qwen")).rejects.toBeInstanceOf(CredentialStoreError);
-    await expect(unavailable.get("qwen")).rejects.toMatchObject({
+    await expect(unavailable.get("my-account")).rejects.toBeInstanceOf(CredentialStoreError);
+    await expect(unavailable.get("my-account")).rejects.toMatchObject({
       code: "CREDENTIAL_STORE_UNAVAILABLE",
     });
 
     const failed = createMacOSKeychainStore({ platform: "darwin", run: runner(1) });
-    await expect(failed.get("qwen")).rejects.toMatchObject({
+    await expect(failed.get("my-account")).rejects.toMatchObject({
       code: "CREDENTIAL_COMMAND_FAILED",
     });
   });

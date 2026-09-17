@@ -2,24 +2,23 @@ import { createInterface } from "node:readline/promises";
 
 import type { CliCommand } from "./cli-arguments.js";
 import type { CredentialStore } from "./credentials/credential-store.js";
-import { providerProfileNames, type ProviderProfileName } from "./provider-profiles.js";
 
 type CredentialsCommand = Extract<CliCommand, { kind: "credentials" }>;
 
 export interface CredentialsCommandIO {
-  readonly confirmDelete?: (provider: ProviderProfileName) => Promise<boolean>;
+  readonly confirmDelete?: (account: string) => Promise<boolean>;
   readonly writeError?: (message: string) => void;
   readonly writeOutput?: (message: string) => void;
 }
 
-async function defaultConfirmDelete(provider: ProviderProfileName): Promise<boolean> {
+async function defaultConfirmDelete(account: string): Promise<boolean> {
   if (!process.stdin.isTTY || !process.stderr.isTTY) {
     return false;
   }
   const terminal = createInterface({ input: process.stdin, output: process.stderr });
   try {
     const answer = await terminal.question(
-      `Delete the ${provider} credential from macOS Keychain? [y/N] `,
+      `Delete the ${account} credential from macOS Keychain? [y/N] `,
     );
     return answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes";
   } finally {
@@ -37,24 +36,23 @@ export async function runCredentialsCommand(
   const confirmDelete = io.confirmDelete ?? defaultConfirmDelete;
 
   if (command.action === "set") {
-    await store.setInteractively(command.provider);
-    writeOutput(`${command.provider}: configured`);
+    await store.setInteractively(command.account);
+    writeOutput(`${command.account}: configured`);
     return 0;
   }
 
   if (command.action === "status") {
-    const providers = command.provider === undefined ? providerProfileNames : [command.provider];
-    for (const provider of providers) {
-      writeOutput(`${provider}: ${(await store.has(provider)) ? "configured" : "missing"}`);
-    }
+    writeOutput(
+      `${command.account}: ${(await store.has(command.account)) ? "configured" : "missing"}`,
+    );
     return 0;
   }
 
-  if (!command.assumeYes && !(await confirmDelete(command.provider))) {
+  if (!command.assumeYes && !(await confirmDelete(command.account))) {
     writeError("Credential deletion cancelled. Use --yes for explicit non-interactive deletion.");
     return 1;
   }
-  const deleted = await store.delete(command.provider);
-  writeOutput(`${command.provider}: ${deleted ? "deleted" : "missing"}`);
+  const deleted = await store.delete(command.account);
+  writeOutput(`${command.account}: ${deleted ? "deleted" : "missing"}`);
   return 0;
 }

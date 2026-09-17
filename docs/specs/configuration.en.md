@@ -6,9 +6,12 @@
 - Accepted: 2026-08-28
 - Amended: 2026-08-31 by Issue #14 (optional Provider reasoning effort)
 - Amended: 2026-09-01 by Issue #16 (Provider profiles and macOS Keychain credentials)
-- Version: v0.1.0
+- Amended: 2026-09-17 by Issue #63 (built-in profiles removed in favor of generic Provider
+  configuration)
+- Version: v0.3.0
 - Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.en.md),
-  [ADR 0002](../adr/0002-macos-keychain-provider-profiles.en.md)
+  [ADR 0002](../adr/0002-macos-keychain-provider-profiles.en.md),
+  [ADR 0004](../adr/0004-generic-provider-configuration.en.md)
 
 ## Sources and precedence
 
@@ -21,42 +24,39 @@ Sight MCP does not load `.env`, YAML, JSON, TOML, shell profiles, or repository 
 implicitly. It does not search the current directory for configuration. This avoids surprising
 credential discovery and makes the host configuration the auditable runtime boundary.
 
-`--provider qwen|deepseek` activates one built-in profile. The profile fixes the API root and model;
-it does not load a general configuration file. Its credential precedence is:
+The endpoint and model come entirely from `SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL`; the
+code contains no built-in Provider address or model. API key resolution precedence is:
 
 1. `SIGHT_PROVIDER_API_KEY`;
-2. the selected profile's `SIGHT_QWEN_API_KEY` or `SIGHT_DEEPSEEK_API_KEY`;
-3. the selected profile's macOS Keychain item.
+2. the macOS Keychain item named by `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`.
 
-Only the selected profile's credential is read. A missing credential fails startup without trying a
-different Provider. Other variables, including allowed roots and resource limits, continue to come
-from the process environment and compiled defaults.
+With neither set, the endpoint is treated as unauthenticated (no authorization header), which suits
+local servers. If `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` is set but the item is missing or the lookup
+fails, startup fails without trying another credential source. Other variables, including allowed
+roots and resource limits, continue to come from the process environment and compiled defaults.
 
 Adding a general config file or another runtime CLI override requires a proposal that defines
 precedence and secret handling.
 
-## CLI and built-in profiles
+## CLI and credential commands
 
 ```text
-sight-mcp [--provider <qwen|deepseek>]
-sight-mcp credentials set <qwen|deepseek>
-sight-mcp credentials status [qwen|deepseek]
-sight-mcp credentials delete <qwen|deepseek> [--yes]
+sight-mcp
+sight-mcp credentials set <account>
+sight-mcp credentials status <account>
+sight-mcp credentials delete <account> [--yes]
 ```
 
-No argument starts generic environment mode. An unknown argument or profile exits with status `2`
-before the stdio transport starts. Credential management commands are normal human-facing CLI
-commands and may write status to stdout; server mode continues to reserve stdout exclusively for MCP
-frames.
+No argument starts environment-variable mode. An unknown argument exits with status `2` before the
+stdio transport starts; the removed `--provider` flag exits with status `2` and prints migration
+guidance. `<account>` is a user-chosen Keychain account name (1-64 characters, starting with a
+letter, then digits, `.`, `_`, `@`, or `-`) and must match `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`.
+Keychain cannot enumerate items, so `status` requires an explicit account name. Credential
+management commands are normal human-facing CLI commands and may write status to stdout; server mode
+continues to reserve stdout exclusively for MCP frames.
 
-| Profile    | API root                                            | Model                          | Default effort |
-| ---------- | --------------------------------------------------- | ------------------------------ | -------------- |
-| `qwen`     | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash`                | `low`          |
-| `deepseek` | `https://api.deepseek.com`                          | `deepseek-v4-flash-vision-exp` | `low`          |
-
-`SIGHT_PROVIDER_REASONING_EFFORT` may override the profile's default effort. Provider profile URL
-and model are atomic and cannot be overridden while the profile is active. Changing `--provider` and
-restarting the MCP host is the only Provider switch; there is no automatic fallback.
+Editing environment variables and restarting the MCP host is the only Provider switch; there is no
+automatic fallback.
 
 ## Variables
 
@@ -68,9 +68,8 @@ variables are implemented by Issue #5 at the application-service boundary.
 | ----------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `SIGHT_PROVIDER_BASE_URL`           | required         | Absolute provider base URL ending at the API root, for example `https://provider.example/v1`; no userinfo, query, or fragment |
 | `SIGHT_PROVIDER_MODEL`              | required         | Non-empty model identifier, maximum 256 characters                                                                            |
-| `SIGHT_PROVIDER_API_KEY`            | optional         | Bearer credential; empty/unset means no authorization header, suitable for local endpoints                                    |
-| `SIGHT_QWEN_API_KEY`                | optional         | Qwen credential used only by `--provider qwen`, after the generic override and before Keychain                                |
-| `SIGHT_DEEPSEEK_API_KEY`            | optional         | DeepSeek credential used only by `--provider deepseek`, after the generic override and before Keychain                        |
+| `SIGHT_PROVIDER_API_KEY`            | optional         | Bearer credential; empty or unset sends no authorization header; takes precedence over Keychain                               |
+| `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`   | optional         | macOS Keychain account read when no environment key is set, 1-64 characters                                                   |
 | `SIGHT_PROVIDER_REASONING_EFFORT`   | optional         | `low`, `medium`, `high`, `xhigh`, or `max`; omitted unless explicitly configured                                              |
 | `SIGHT_ALLOWED_ROOTS`               | process cwd      | Platform-delimited absolute roots using Node's `path.delimiter`; each root is canonicalized at startup                        |
 | `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`          | Integer from 1000 through 300000; overall tool-call deadline including queue and retries                                      |
@@ -205,13 +204,13 @@ The server does not print a startup banner to stdout.
 - Tests use obvious placeholders and verify redaction against representative error paths.
 - On macOS, `credentials set` writes an exact generic-password item using `/usr/bin/security` and
   the system's interactive password prompt. The service is
-  `dev.weiki886.sight-mcp.provider-api-key`; accounts are exactly `qwen` and `deepseek`.
+  `dev.weiki886.sight-mcp.provider-api-key`; the account is a user-chosen name.
 - Interactive setup passes no secret in a process argument or through a shell. It requires stdin and
   stderr terminals and fails rather than accepting piped key material.
 - Runtime lookup captures at most the validated key bound, discards system diagnostics, and keeps
   the value only in process memory. `credentials status` checks item existence without reading the
   password.
-- `credentials delete` names one exact profile and prompts by default. `--yes` is required for
+- `credentials delete` names one exact account and prompts by default. `--yes` is required for
   explicit non-interactive deletion.
 - A locked, unavailable, or failed Keychain query produces a sanitized startup failure and does not
   fall back to another Provider.
@@ -219,13 +218,14 @@ The server does not print a startup banner to stdout.
   It must not recommend committing keys to `.mcp.json`, `config.toml`, shell scripts, or repository
   `.env` files.
 
-Keychain storage is macOS-only in v0.1.0. On Linux and Windows, profiles can use their selected
-profile-specific environment variable or the generic override. Generic no-argument mode is unchanged
-and never queries Keychain.
+Keychain storage is macOS-only. On Linux and Windows, use the `SIGHT_PROVIDER_API_KEY` environment
+variable; Keychain is never queried unless `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` is set.
 
 ## Compatibility policy
 
-Environment variable names, profile names, credential commands, and their precedence are public
-interfaces. Adding an optional variable is backward compatible. Removing, renaming, changing
+Environment variable names, credential commands, the Keychain service name, and their precedence are
+public interfaces. Adding an optional variable is backward compatible. Removing, renaming, changing
 precedence, or weakening a safe default requires release notes and a migration path; after 1.0 it
-requires a major version.
+requires a major version. v0.3.0 applies this policy: it removes the built-in profiles, the
+`--provider` flag, and the profile-specific environment variables (`SIGHT_QWEN_API_KEY` /
+`SIGHT_DEEPSEEK_API_KEY`), with a migration path documented in the README.

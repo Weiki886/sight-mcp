@@ -6,9 +6,11 @@
 - 接受日期：2026-08-28
 - 修订：2026-08-31，依据 Issue #14（可选的 Provider 推理强度）
 - 修订：2026-09-01，依据 Issue #16（Provider profiles 与 macOS Keychain 凭据）
-- 版本：v0.1.0
+- 修订：2026-09-17，依据 Issue #63（移除内置 profiles，改为通用 Provider 配置）
+- 版本：v0.3.0
 - 相关：[提案 0001](../proposals/0001-sight-mcp-v0.1.0.md)、
-  [ADR 0002](../adr/0002-macos-keychain-provider-profiles.md)
+  [ADR 0002](../adr/0002-macos-keychain-provider-profiles.md)、
+  [ADR 0004](../adr/0004-generic-provider-configuration.md)
 
 ## 来源与优先级
 
@@ -20,37 +22,34 @@
 Sight MCP 不会隐式加载
 `.env`、YAML、JSON、TOML、shell 配置文件或仓库中的凭据文件，也不会在当前目录搜索配置。这避免了令人意外的凭据发现行为，并使宿主配置成为可审计的运行时边界。
 
-`--provider qwen|deepseek`
-会激活一个内置 profile。该 profile 固定 API 根地址与模型；它不会加载任何通用配置文件。其凭据优先级为：
+端点与模型完全由 `SIGHT_PROVIDER_BASE_URL` 与 `SIGHT_PROVIDER_MODEL`
+决定；代码中不存在任何内置的 Provider 地址或模型。API 密钥的解析优先级为：
 
 1. `SIGHT_PROVIDER_API_KEY`；
-2. 所选 profile 的 `SIGHT_QWEN_API_KEY` 或 `SIGHT_DEEPSEEK_API_KEY`；
-3. 所选 profile 的 macOS Keychain 条目。
+2. `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` 指定的 macOS Keychain 条目。
 
-只会读取所选 profile 的凭据。凭据缺失时启动失败，且不会尝试改用其它 Provider。其余变量（包括允许根目录与资源限制）仍然来自进程环境与编译默认值。
+两者都未设置时，按无鉴权端点处理（不发送 authorization 头），适用于本地服务。设置了
+`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`
+但条目缺失或查询失败时启动失败，且不会尝试改用其它凭据来源。其余变量（包括允许根目录与资源限制）仍然来自进程环境与编译默认值。
 
 新增通用配置文件或其它运行时 CLI 覆盖方式，需要一份定义了优先级与密钥处理方式的提案。
 
-## CLI 与内置 profiles
+## CLI 与凭据命令
 
 ```text
-sight-mcp [--provider <qwen|deepseek>]
-sight-mcp credentials set <qwen|deepseek>
-sight-mcp credentials status [qwen|deepseek]
-sight-mcp credentials delete <qwen|deepseek> [--yes]
+sight-mcp
+sight-mcp credentials set <account>
+sight-mcp credentials status <account>
+sight-mcp credentials delete <account> [--yes]
 ```
 
-不带参数即以通用环境变量模式启动。未知参数或未知 profile 会在 stdio 传输启动之前以状态码 `2`
-退出。凭据管理命令是面向人类的普通 CLI 命令，可以向 stdout 写入状态；而服务端模式依然把 stdout 专门保留给 MCP 帧。
+不带参数即以环境变量模式启动。未知参数会在 stdio 传输启动之前以状态码 `2` 退出；已移除的
+`--provider` 参数会以状态码 `2` 退出并输出迁移指引。`<account>`
+是用户自取的 Keychain 账户名（1–64 个字符，字母开头，可含数字、`.`、`_`、`@`、`-`），需与
+`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` 保持一致。Keychain 无法枚举条目，因此 `status`
+必须显式给出账户名。凭据管理命令是面向人类的普通 CLI 命令，可以向 stdout 写入状态；而服务端模式依然把 stdout 专门保留给 MCP 帧。
 
-| Profile    | API 根地址                                          | 模型                           | 默认推理强度 |
-| ---------- | --------------------------------------------------- | ------------------------------ | ------------ |
-| `qwen`     | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash`                | `low`        |
-| `deepseek` | `https://api.deepseek.com`                          | `deepseek-v4-flash-vision-exp` | `low`        |
-
-`SIGHT_PROVIDER_REASONING_EFFORT` 可以覆盖 profile 的默认推理强度。Provider
-profile 的 URL 与模型是原子绑定的，在 profile 生效期间不可覆盖。更换 `--provider`
-并重启 MCP 宿主是唯一的 Provider 切换方式；不存在自动回退。
+修改环境变量并重启 MCP 宿主是唯一的 Provider 切换方式；不存在自动回退。
 
 ## 变量
 
@@ -62,9 +61,8 @@ profile 的 URL 与模型是原子绑定的，在 profile 生效期间不可覆�
 | ----------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
 | `SIGHT_PROVIDER_BASE_URL`           | 必填        | 以 API 根结尾的绝对 Provider 基础 URL，例如 `https://provider.example/v1`；不含 userinfo、query 或 fragment |
 | `SIGHT_PROVIDER_MODEL`              | 必填        | 非空模型标识，最多 256 个字符                                                                               |
-| `SIGHT_PROVIDER_API_KEY`            | 可选        | Bearer 凭据；为空或未设置表示不发送 authorization 头，适用于本地端点                                        |
-| `SIGHT_QWEN_API_KEY`                | 可选        | 仅由 `--provider qwen` 使用的 Qwen 凭据，优先级在通用覆盖之后、Keychain 之前                                |
-| `SIGHT_DEEPSEEK_API_KEY`            | 可选        | 仅由 `--provider deepseek` 使用的 DeepSeek 凭据，优先级在通用覆盖之后、Keychain 之前                        |
+| `SIGHT_PROVIDER_API_KEY`            | 可选        | Bearer 凭据；为空或未设置时不发送 authorization 头；优先于 Keychain                                         |
+| `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`   | 可选        | 无环境密钥时读取的 macOS Keychain 账户名，1–64 个字符                                                       |
 | `SIGHT_PROVIDER_REASONING_EFFORT`   | 可选        | `low`、`medium`、`high`、`xhigh` 或 `max`；未显式配置时不发送                                               |
 | `SIGHT_ALLOWED_ROOTS`               | 进程 cwd    | 使用 Node `path.delimiter` 分隔的绝对根目录；每个根在启动时被规范化                                         |
 | `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`     | 1000 到 300000 之间的整数；工具调用的整体截止时间，含排队与重试                                             |
@@ -178,17 +176,21 @@ URL，都会导致以非零状态退出，并在 stderr 输出稳定的脱敏诊
 - 测试使用明显的占位符，并针对有代表性的错误路径验证脱敏效果。
 - 在 macOS 上，`credentials set` 通过 `/usr/bin/security`
   与系统交互式密码提示，写入一条精确的 generic-password 条目。service 为
-  `dev.weiki886.sight-mcp.provider-api-key`；account 恰好是 `qwen` 与 `deepseek`。
+  `dev.weiki886.sight-mcp.provider-api-key`；account 是用户自取的账户名。
 - 交互式配置不会通过进程参数或 shell 传递任何密钥。它要求 stdin 与 stderr 均为终端，宁可失败也不接受通过管道传入的密钥材料。
 - 运行时查询最多只捕获校验过的密钥上限长度，丢弃系统诊断信息，并只把值保留在进程内存中。`credentials status`
   只检查条目是否存在，不读取密码。
-- `credentials delete` 精确指定一个 profile，且默认会提示确认。显式的非交互式删除需要 `--yes`。
+- `credentials delete` 精确指定一个账户名，且默认会提示确认。显式的非交互式删除需要 `--yes`。
 - Keychain 被锁定、不可用或查询失败时，产生一次脱敏的启动失败，而不会回退到另一个 Provider。
 - 文档推荐使用 macOS Keychain、由宿主管理的环境变量，或本地 Provider。绝不能推荐把密钥提交到
   `.mcp.json`、`config.toml`、shell 脚本或仓库 `.env` 文件中。
 
-v0.1.0 中 Keychain 存储仅限 macOS。在 Linux 与 Windows 上，profile 可以使用其对应的 profile 专属环境变量或通用覆盖变量。通用的「不带参数」模式保持不变，且从不查询 Keychain。
+Keychain 存储仅限 macOS。在 Linux 与 Windows 上，使用 `SIGHT_PROVIDER_API_KEY` 环境变量；未设置
+`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` 时从不查询 Keychain。
 
 ## 兼容性策略
 
-环境变量名、profile 名称、凭据命令及其优先级都属于公开接口。新增可选变量是向后兼容的。删除、重命名、更改优先级或削弱某个安全默认值，都需要发布说明与迁移路径；1.0 之后还需要主版本号变更。
+环境变量名、凭据命令、Keychain
+service 名及其优先级都属于公开接口。新增可选变量是向后兼容的。删除、重命名、更改优先级或削弱某个安全默认值，都需要发布说明与迁移路径；1.0 之后还需要主版本号变更。v0.3.0 依据本策略移除了内置 profiles、`--provider`
+参数与 profile 专属环境变量（`SIGHT_QWEN_API_KEY` /
+`SIGHT_DEEPSEEK_API_KEY`），并在 README 中提供迁移路径。

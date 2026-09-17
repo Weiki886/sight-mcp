@@ -6,7 +6,7 @@
 - 适配器名称：`openai-compatible`
 - 调用地址：`{SIGHT_PROVIDER_BASE_URL}/chat/completions`
 - 传输格式：归一化后的 JPEG 或 PNG data URL
-- 内置 profile：`qwen`、`deepseek`（Issue #16）
+- Provider 配置：完全由环境变量提供（Issue #63）；无内置模型
 
 ## 兼容性约定
 
@@ -33,19 +33,19 @@ MCP 刻意不使用厂商专有的响应字段，也不引入 OpenAI SDK，以�
 - 重定向会被转换成脱敏的 Provider 失败，永远不跟随。
 - 不存在兜底端点、Provider 自动切换、代理探测，也不接受由模型或工具输入提供的 URL。
 
-## 内置 profile 与实测目标
+## 配置示例
 
-内置 profile 与实测目标如下：
+适配器不内置任何 Provider 地址或模型；端点与模型完全由 `SIGHT_PROVIDER_BASE_URL` 与
+`SIGHT_PROVIDER_MODEL` 决定。一个经过实测的配置示例：
 
-| Profile    | 角色     | Base URL                                            | 模型                           | 默认 effort |
-| ---------- | -------- | --------------------------------------------------- | ------------------------------ | ----------- |
-| `qwen`     | 主选     | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash`                | `low`       |
-| `deepseek` | 手动备选 | `https://api.deepseek.com`                          | `deepseek-v4-flash-vision-exp` | `low`       |
+| Base URL                                            | 模型            | 建议 effort |
+| --------------------------------------------------- | --------------- | ----------- |
+| `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash` | `low`       |
 
-在 macOS 上，`--provider` 会在文档所述的环境变量覆盖之后读取对应的 Keychain 账户。在其他平台上请使用
-`SIGHT_QWEN_API_KEY` 或 `SIGHT_DEEPSEEK_API_KEY`；通用的 `SIGHT_PROVIDER_API_KEY`
-是优先级最高的显式覆盖项。切换 Provider 是一次显式的重启参数变更。出错后 Sight
-MCP 绝不会把图片再发给第二个 Provider。DeepSeek 目标属于实验性质，在发布验证矩阵通过之前不应被当作稳定的兼容性保证。
+API 密钥按文档所述的优先级解析：`SIGHT_PROVIDER_API_KEY` 环境变量优先，其次是
+`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` 指定的 macOS
+Keychain 账户。切换 Provider 是一次显式的环境变量变更加宿主重启。出错后 Sight
+MCP 绝不会把图片再发给第二个 Provider。
 
 ## 边界与重试
 

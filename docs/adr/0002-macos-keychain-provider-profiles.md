@@ -2,7 +2,8 @@
 
 **语言 / Language：** 中文 · [English](0002-macos-keychain-provider-profiles.en.md)
 
-- 状态：已接受
+- 状态：已接受（内置 profiles 设计自 v0.3.0 起被 [ADR 0004](0004-generic-provider-configuration.md)
+  取代；Keychain 存储与凭据命令设计仍然有效）
 - 接受日期：2026-09-01
 - 日期：2026-09-01
 - 决策者：Weiki886

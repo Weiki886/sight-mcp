@@ -6,14 +6,15 @@
 - Accepted: 2026-08-28
 - Date: 2026-08-28
 - Amended: 2026-09-01 by Issue #16 (Keychain profiles) and clipboard image input
+- Amended: 2026-09-17 by Issue #63 (built-in profiles removed; generic Provider configuration)
 - Runtime risk: High
 - Scope: local stdio server, local file and macOS clipboard image input, `sharp` preprocessing, one
-  OpenAI-compatible vision provider, built-in Provider profiles, and optional macOS Keychain
-  credentials
+  environment-configured OpenAI-compatible vision provider, and optional macOS Keychain credentials
 - Related: [Proposal 0001](../proposals/0001-sight-mcp-v0.1.0.en.md),
   [tool contract](../specs/vision-tool-contract.en.md),
   [configuration](../specs/configuration.en.md),
-  [ADR 0002](../adr/0002-macos-keychain-provider-profiles.en.md)
+  [ADR 0002](../adr/0002-macos-keychain-provider-profiles.en.md),
+  [ADR 0004](../adr/0004-generic-provider-configuration.en.md)
 
 ## Security objectives
 
@@ -31,7 +32,7 @@
 - Contents and metadata of the selected image.
 - Contents and names of unrelated local files.
 - Provider API key and endpoint configuration.
-- Provider profile selection and macOS Keychain item metadata.
+- Provider endpoint/model configuration and macOS Keychain item metadata.
 - The user's prompt and the provider's answer.
 - Provider quota, billing, and availability.
 - Host and server process availability.
@@ -49,8 +50,8 @@
 - Vision provider: separately operated local or remote service; its output is untrusted.
 - Network attacker: relevant for remote provider traffic and dependency/package retrieval.
 - Repository contributor or compromised dependency: potential supply-chain actor.
-- macOS Keychain and `securityd`: operating-system credential boundary used by an explicitly
-  selected profile.
+- macOS Keychain and `securityd`: operating-system credential boundary used only when
+  `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` is set explicitly.
 - macOS system clipboard and `osascript`: native source and consent boundary used by
   `analyze_clipboard_image`.
 
@@ -121,10 +122,10 @@ stdout is a separate protocol-only boundary. No diagnostic data may cross it.
 | CFG-01  | Missing/invalid config falls back unsafely                              | Wrong endpoint or excessive access                      | Fail before transport connect; cwd-only root default; no implicit credential/config files                                                                                                                                     | Startup matrix tests                                                                                         |
 | CFG-02  | Debug serialization exposes secrets                                     | Credential leak                                         | Secret wrapper/redaction; prohibit dumping env/config/request objects                                                                                                                                                         | Canary-secret tests at every log level                                                                       |
 | CRED-01 | Setup places a key in process arguments, shell history, or piped input  | Credential disclosure                                   | Invoke absolute `/usr/bin/security` without a shell; require an interactive terminal; use prompt-only `-w` last; never accept a key argument                                                                                  | Subprocess-argument and non-TTY unit tests                                                                   |
-| CRED-02 | A key is paired with the wrong Provider endpoint or model               | Authentication failure or unintended disclosure         | Fixed profiles bind endpoint, model, and exact account; read only the selected profile; no automatic fallback                                                                                                                 | Profile mapping, precedence, and selected-account tests                                                      |
+| CRED-02 | A key is paired with the wrong Provider endpoint or model               | Authentication failure or unintended disclosure         | Endpoint and model come only from validated environment configuration; Keychain is read only for an explicitly named account; no automatic fallback                                                                           | Precedence and named-account resolution tests                                                                |
 | CRED-03 | Keychain stdout, stderr, timeout, or command failure leaks a credential | Credential disclosure or startup hang                   | Exact query; no shell; bounded stdout and duration; discard system stderr; sanitized errors; fail closed                                                                                                                      | Keychain adapter bounds/error tests and canary-redaction tests                                               |
-| CRED-04 | Broad or unintended deletion removes another credential                 | Credential loss                                         | Exact service/account allowlist; one profile per command; interactive confirmation unless `--yes`                                                                                                                             | CLI parser and deletion-confirmation tests                                                                   |
-| CRED-05 | Missing, locked, or unsupported Keychain causes unsafe fallback         | Wrong credential/Provider use                           | Keychain is used only by explicit profile selection; failure aborts startup; environment precedence is fixed; no second Provider attempt                                                                                      | Missing/unavailable/command-failure startup tests                                                            |
+| CRED-04 | Broad or unintended deletion removes another credential                 | Credential loss                                         | Exact service and a validated account-name format; one account per command; interactive confirmation unless `--yes`                                                                                                           | CLI parser and deletion-confirmation tests                                                                   |
+| CRED-05 | Missing, locked, or unsupported Keychain causes unsafe fallback         | Wrong credential/Provider use                           | Keychain is used only when `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` is set explicitly; failure aborts startup; environment precedence is fixed; no second Provider attempt                                                           | Missing/unavailable/command-failure startup tests                                                            |
 | CB-01   | Clipboard read without user consent                                     | Unnoticed sensitive-image disclosure                    | Require a native confirmation before every read; map rejection to `CLIPBOARD_ACCESS_DENIED`; no silent or cached consent                                                                                                      | Reader unit tests assert confirmation precedes read and rejection maps correctly                             |
 | CB-02   | Temporary file leaks clipboard pixels or persists                       | On-disk sensitive-image exposure                        | Stage in a user-private `0700` directory with a random UUID name; read immediately; delete in a `finally` on every exit path                                                                                                  | Unit tests verify private mode, unique name, and deletion on success/failure/abort                           |
 | CB-03   | Oversized or malformed clipboard content exhausts memory or disk        | Resource exhaustion or denial                           | Reuse the `FILE_TOO_LARGE` byte cap; bounded read; no unbounded staging; downstream pipeline revalidates format                                                                                                               | Oversize and read-failure tests                                                                              |
@@ -147,9 +148,9 @@ stdout is a separate protocol-only boundary. No diagnostic data may cross it.
 6. The server writes no prompt, answer, image, or usage history to disk.
 7. Provider-side retention is outside Sight MCP's control and must be assessed by the user when
    choosing a remote endpoint.
-8. With a built-in profile, the selected API key is requested from the exact Keychain service and
-   account, held in bounded process memory, wrapped by the same redacted secret type, and used only
-   for that Provider request. Sight MCP does not cache it on disk.
+8. With `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` configured, the API key is requested from the exact
+   Keychain service and that account, held in bounded process memory, wrapped by the same redacted
+   secret type, and used only for that Provider request. Sight MCP does not cache it on disk.
 
 JavaScript cannot guarantee immediate zeroization of all copies. The design minimizes lifetime and
 duplication but does not claim secure erasure from managed memory.
@@ -196,8 +197,8 @@ User documentation must state:
 - Remote provider policy and retention cannot be technically enforced by Sight MCP.
 - macOS Keychain reduces plaintext exposure but is not a boundary against a process that already
   controls the same user account or can obtain access through that user's Keychain policy.
-- A stored key is briefly present in managed Node.js memory during profile startup and cannot be
-  guaranteed to be immediately zeroized.
+- A stored key is briefly present in managed Node.js memory during startup and cannot be guaranteed
+  to be immediately zeroized.
 - An operator can intentionally configure an overly broad allowed root or a remote provider;
   warnings cannot replace operator judgment.
 
@@ -207,5 +208,5 @@ Update or supersede this threat model before adding URL/base64 input, archives, 
 server-side capture, caches, persistent logs, telemetry, multiple providers, automatic failover,
 Streamable HTTP, authentication, remote hosting, multi-tenant use, another operating-system
 credential backend, a non-macOS clipboard backend, OS-native screenshot or server-side capture, a
-persistent clipboard cache, silent or consent-cached clipboard reads, or a change to
-profile/credential precedence.
+persistent clipboard cache, silent or consent-cached clipboard reads, or a change to credential
+precedence.

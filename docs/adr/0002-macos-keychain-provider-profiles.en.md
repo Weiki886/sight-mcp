@@ -2,7 +2,9 @@
 
 **语言 / Language：** [中文](0002-macos-keychain-provider-profiles.md) · English
 
-- Status: Accepted
+- Status: Accepted (the built-in profiles design is superseded by
+  [ADR 0004](0004-generic-provider-configuration.en.md) as of v0.3.0; the Keychain storage and
+  credential command design remains in effect)
 - Accepted: 2026-09-01
 - Date: 2026-09-01
 - Deciders: Weiki886

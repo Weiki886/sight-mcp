@@ -189,10 +189,10 @@ describe("OpenAI-compatible vision provider", () => {
       "https://workspace-123.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
     ],
     [
-      "DeepSeek V4 Flash Vision Exp",
-      "https://api.deepseek.com",
-      "deepseek-v4-flash-vision-exp",
-      "https://api.deepseek.com/chat/completions",
+      "custom OpenAI-compatible endpoint",
+      "https://vision.example.com/v1",
+      "custom-vision-model",
+      "https://vision.example.com/v1/chat/completions",
     ],
   ])(
     "maps the documented %s configuration to the compatible request contract",

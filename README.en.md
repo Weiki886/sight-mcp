@@ -36,7 +36,7 @@ endpoint.
 
 ```sh
 # 1. Save your provider key once (macOS Keychain; prompts interactively, never in shell history)
-npx -y @weiki/sight-mcp@0.2.1 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
 
 # 2. Register the server with your host and pick a provider (see the snippets below).
 
@@ -63,8 +63,9 @@ image to the clipboard and call `analyze_clipboard_image(prompt)` without any pa
   metadata, orientation-corrected, and resized without enlargement in RAM before transmission.
 - **One-click clipboard reading (macOS)** — `analyze_clipboard_image` asks for explicit native
   consent, then deletes its staging file on every exit path.
-- **Bundled domestic providers** — `--provider qwen` (Qwen 3.8 Flash) and `--provider deepseek`
-  (DeepSeek V4 Flash Vision Exp) as one fixed, reviewed endpoint + model pair.
+- **Any vision model** — no bundled models; point `SIGHT_PROVIDER_BASE_URL` + `SIGHT_PROVIDER_MODEL`
+  at any OpenAI-compatible vision endpoint (local or remote), so model upgrades and deprecations
+  stay under your control.
 - **Keychain-first credentials** — store keys outside host config and shell history on macOS; stay
   portable via environment variables on Linux, Windows, and CI.
 - **Fail-closed and observable** — no silent provider/endpoint fallback, no redirect following,
@@ -91,29 +92,38 @@ install and invoke the generated `.tgz` instead of substituting another package 
 
 ## Provider Setup
 
-Store each remote Provider key once in macOS Keychain. The system command prompts for the secret
-directly, so the key does not appear in the command, shell history, MCP host configuration, or a
-repository `.env` file:
+Sight MCP bundles no models. Two required environment variables connect any OpenAI-compatible vision
+endpoint:
+
+- `SIGHT_PROVIDER_BASE_URL`: the Provider API root (HTTPS for remote hosts; exact loopback HTTP is
+  allowed).
+- `SIGHT_PROVIDER_MODEL`: the vision model identifier on that endpoint.
+
+The API key resolves in this order: the `SIGHT_PROVIDER_API_KEY` environment variable, then macOS
+Keychain (the account named by `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`). With neither set, the endpoint is
+treated as unauthenticated (suitable for local servers).
+
+On macOS, store the key once in Keychain. The system command prompts for the secret directly, so the
+key does not appear in the command, shell history, MCP host configuration, or a repository `.env`
+file:
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.1 credentials set qwen
-npx -y @weiki/sight-mcp@0.2.1 credentials set deepseek
-npx -y @weiki/sight-mcp@0.2.1 credentials status
+npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
+npx -y @weiki/sight-mcp@0.2.1 credentials status my-provider
 ```
 
-Only configure the Provider you use. `credentials status [qwen|deepseek]` reports `configured` or
-`missing` without reading the stored password. To remove one item, run
-`credentials delete qwen|deepseek`; deletion asks for confirmation unless `--yes` is explicit.
-
-Start the server with `--provider qwen` or `--provider deepseek`. The profile binds the reviewed API
-root, model, default reasoning effort, and matching Keychain account. Switching the argument and
-restarting the host switches Provider; Sight MCP never falls back automatically.
+You choose the account name (`my-provider` above); keep it in sync with the host's
+`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`. `credentials status <account>` reports `configured` or `missing`
+without reading the stored password. To remove one item, run `credentials delete <account>`;
+deletion asks for confirmation unless `--yes` is explicit. Switch endpoint or model by editing the
+environment variables and restarting the host; Sight MCP never falls back to another Provider
+automatically.
 
 ## Claude Code configuration
 
 Claude Code supports local stdio servers at local, project, and user scopes. A project configuration
-is `.mcp.json` in the project root. On macOS, the recommended profile configuration contains no API
-key:
+is `.mcp.json` in the project root. On macOS, the recommended configuration contains no API key (the
+credential stays in Keychain):
 
 ```json
 {
@@ -121,9 +131,12 @@ key:
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki/sight-mcp@0.2.1", "--provider", "qwen"],
+      "args": ["-y", "@weiki/sight-mcp@0.2.1"],
       "env": {
-        "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images"
+        "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images",
+        "SIGHT_PROVIDER_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "SIGHT_PROVIDER_MODEL": "qwen3.8-flash",
+        "SIGHT_PROVIDER_KEYCHAIN_ACCOUNT": "my-provider"
       }
     }
   }
@@ -139,17 +152,21 @@ CLI behavior.
 ## Codex configuration
 
 Codex reads user configuration from `~/.codex/config.toml`; a trusted project may instead use
-`.codex/config.toml`. On macOS, select the profile in `args` and leave the credential in Keychain:
+`.codex/config.toml`. On macOS, select the endpoint and model through environment variables and
+leave the credential in Keychain:
 
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki/sight-mcp@0.2.1", "--provider", "qwen"]
+args = ["-y", "@weiki/sight-mcp@0.2.1"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
 [mcp_servers.sight-mcp.env]
 SIGHT_ALLOWED_ROOTS = "/absolute/path/to/allowed/images"
+SIGHT_PROVIDER_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+SIGHT_PROVIDER_MODEL = "qwen3.8-flash"
+SIGHT_PROVIDER_KEYCHAIN_ACCOUNT = "my-provider"
 ```
 
 Use `codex mcp list` to verify discovery and `/mcp` inside Codex to inspect the connection. The tool
@@ -190,11 +207,10 @@ analyze_clipboard_image(prompt)   (macOS only)
 | `SIGHT_TRANSMIT_MAX_DIMENSION`      | `2048`     | Maximum normalized width or height, without enlargement        |
 | `SIGHT_MAX_TRANSMIT_BYTES`          | `10485760` | Maximum normalized image bytes                                 |
 | `SIGHT_JPEG_QUALITY`                | `85`       | Opaque JPEG quality, from 40 through 95                        |
-| `SIGHT_PROVIDER_BASE_URL`           | required*  | Provider API root; HTTPS remote or HTTP exact loopback         |
-| `SIGHT_PROVIDER_MODEL`              | required*  | Configured vision model identifier                             |
-| `SIGHT_PROVIDER_API_KEY`            | unset      | Optional Bearer credential inherited from the host             |
-| `SIGHT_QWEN_API_KEY`                | unset      | Optional `--provider qwen` environment credential              |
-| `SIGHT_DEEPSEEK_API_KEY`            | unset      | Optional `--provider deepseek` environment credential          |
+| `SIGHT_PROVIDER_BASE_URL`           | required   | Provider API root; HTTPS remote or HTTP exact loopback         |
+| `SIGHT_PROVIDER_MODEL`              | required   | Configured vision model identifier                             |
+| `SIGHT_PROVIDER_API_KEY`            | unset      | Optional Bearer credential; takes precedence over Keychain     |
+| `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`   | unset      | Optional macOS Keychain account read when no environment key   |
 | `SIGHT_PROVIDER_REASONING_EFFORT`   | unset      | Optional `low`, `medium`, `high`, `xhigh`, or `max`            |
 | `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`    | Overall Tool deadline, including queue and Provider retries    |
 | `SIGHT_PROVIDER_MAX_TOKENS`         | `4096`     | Provider answer-token request cap                              |
@@ -213,49 +229,55 @@ a warning. PNG, JPEG, and WebP are recognized from content rather than filename 
 or unsupported formats are rejected. Images are orientation-corrected, stripped of metadata, resized
 without enlargement, and encoded as JPEG when opaque or PNG when transparency is required.
 
-`*` `SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL` are required only in generic no-argument
-mode. A built-in `--provider` profile supplies both as one fixed pair.
+### Configuration example
 
-### Recommended domestic vision Providers
-
-Use the Qwen 3.8 Flash profile as the primary Provider:
+Using Alibaba Cloud Model Studio's Qwen 3.8 Flash as an example (any OpenAI-compatible endpoint
+follows the same pattern):
 
 ```text
---provider qwen
+SIGHT_PROVIDER_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+SIGHT_PROVIDER_MODEL=qwen3.8-flash
+SIGHT_PROVIDER_REASONING_EFFORT=low
 ```
 
-Use DeepSeek V4 Flash Vision Exp as a manually selected alternative:
+Keychain is preferred on macOS (`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` + `credentials set`). For Linux,
+Windows, CI, or a deliberately ephemeral override, set `SIGHT_PROVIDER_API_KEY` directly in the host
+process environment. Never paste a real key into a tracked `.mcp.json`, `config.toml`, `.env`, shell
+script, Issue, or log.
 
-```text
---provider deepseek
-```
-
-The profiles use `https://dashscope.aliyuncs.com/compatible-mode/v1` with `qwen3.8-flash`, and
-`https://api.deepseek.com` with `deepseek-v4-flash-vision-exp`; both default to `low` reasoning
-effort. Keychain is preferred on macOS. For Linux, Windows, CI, or a deliberately ephemeral
-override, set `SIGHT_QWEN_API_KEY`, `SIGHT_DEEPSEEK_API_KEY`, or the higher-precedence generic
-`SIGHT_PROVIDER_API_KEY` in the host process environment. Never paste a real key into a tracked
-`.mcp.json`, `config.toml`, `.env`, shell script, Issue, or log.
-
-Generic no-argument mode remains available for a local or another OpenAI-compatible endpoint:
+A local or otherwise unauthenticated OpenAI-compatible endpoint needs no credential at all:
 
 ```text
 SIGHT_PROVIDER_BASE_URL=http://127.0.0.1:11434/v1
 SIGHT_PROVIDER_MODEL=your-vision-model
-SIGHT_PROVIDER_API_KEY=optional-for-local-endpoints
 ```
 
 ### Migrating from `.env` or host-managed plaintext
 
-1. Run `credentials set qwen` and/or `credentials set deepseek` from an interactive terminal.
-2. Confirm the intended entries with `credentials status`.
-3. Add `--provider qwen` or `--provider deepseek` to the host's server arguments.
-4. Remove the API key and generic Provider URL/model from the host entry, then restart the host.
-5. After successful Tool discovery and one synthetic-image call, securely remove old plaintext
-   copies from `.env`, shell scripts, clipboard managers, and configuration backups you control.
+1. Run `credentials set <account>` from an interactive terminal.
+2. Confirm the entry with `credentials status <account>`.
+3. Set `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT=<account>` in the host environment and remove the plaintext
+   API key.
+4. Restart the host. After successful Tool discovery and one synthetic-image call, securely remove
+   old plaintext copies from `.env`, shell scripts, clipboard managers, and configuration backups
+   you control.
 
 Do not delete the old copy until the Keychain-backed startup has been verified. If rollback is
-needed, remove `--provider` and restore the previous environment-only configuration.
+needed, remove `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` and restore the previous environment-key
+configuration.
+
+### Migrating from the 0.2.x `--provider` profiles
+
+0.3.0 removes the built-in profiles and the `--provider` flag (`deepseek-v4-flash-vision-exp` has
+been decommissioned upstream). To migrate:
+
+1. Set `SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL` explicitly in the host environment (the
+   former qwen profile corresponds to `https://dashscope.aliyuncs.com/compatible-mode/v1` +
+   `qwen3.8-flash`).
+2. Remove `--provider` from the server arguments; `SIGHT_QWEN_API_KEY` and `SIGHT_DEEPSEEK_API_KEY`
+   are no longer read — use `SIGHT_PROVIDER_API_KEY` instead.
+3. Existing Keychain entries remain valid: set `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` to the former
+   profile name (`qwen`) to keep reusing one, or clean up with `credentials delete <account>`.
 
 ## Privacy and Provider data flow
 
@@ -296,10 +318,11 @@ hosts should avoid immediate unbounded retry loops.
 ## Troubleshooting
 
 - **Server is disconnected:** run the host's MCP list/get command. Confirm Node 22+, the scoped
-  package name, and either a valid `--provider` profile or both generic Provider variables.
-- **Profile credential is missing:** run `credentials status qwen|deepseek`, then run
-  `credentials set qwen|deepseek` from an interactive macOS terminal. On another operating system,
-  inject the selected profile's environment variable.
+  package name, and that both `SIGHT_PROVIDER_BASE_URL` and `SIGHT_PROVIDER_MODEL` are set.
+- **Keychain credential is missing:** run `credentials status <account>`, then run
+  `credentials set <account>` from an interactive macOS terminal, and confirm
+  `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` matches the account name. On another operating system, use the
+  `SIGHT_PROVIDER_API_KEY` environment variable instead.
 - **Keychain lookup fails:** unlock the login Keychain and retry. Sight MCP fails closed and does
   not switch Providers or credentials.
 - **Startup exits immediately:** allowed roots must be existing absolute directories; non-loopback
@@ -354,6 +377,7 @@ scope and design can be agreed on before code.
 - [v0.1.0 proposal and full specification](docs/proposals/0001-sight-mcp-v0.1.0.en.md)
 - [Runtime and architecture ADR](docs/adr/0001-runtime-and-architecture.en.md)
 - [macOS Keychain and Provider profiles ADR](docs/adr/0002-macos-keychain-provider-profiles.en.md)
+- [Generic Provider configuration ADR](docs/adr/0004-generic-provider-configuration.en.md)
 - [One-click clipboard image reading ADR](docs/adr/0003-clipboard-image-reading.en.md)
 - [Vision tool and Provider contract](docs/specs/vision-tool-contract.en.md)
 - [Configuration specification](docs/specs/configuration.en.md)
