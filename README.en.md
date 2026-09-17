@@ -36,7 +36,7 @@ endpoint.
 
 ```sh
 # 1. Save your provider key once (macOS Keychain; prompts interactively, never in shell history)
-npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
+npx -y @weiki/sight-mcp@0.3.0 credentials set my-provider
 
 # 2. Register the server with your host and pick a provider (see the snippets below).
 
@@ -84,7 +84,7 @@ image to the clipboard and call `analyze_clipboard_image(prompt)` without any pa
 Hosts should run the immutable scoped version:
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.1
+npx -y @weiki/sight-mcp@0.3.0
 ```
 
 The unrelated unscoped `sight-mcp` package is not this project. During release-candidate testing,
@@ -108,8 +108,8 @@ key does not appear in the command, shell history, MCP host configuration, or a 
 file:
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
-npx -y @weiki/sight-mcp@0.2.1 credentials status my-provider
+npx -y @weiki/sight-mcp@0.3.0 credentials set my-provider
+npx -y @weiki/sight-mcp@0.3.0 credentials status my-provider
 ```
 
 You choose the account name (`my-provider` above); keep it in sync with the host's
@@ -131,7 +131,7 @@ credential stays in Keychain):
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki/sight-mcp@0.2.1"],
+      "args": ["-y", "@weiki/sight-mcp@0.3.0"],
       "env": {
         "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images",
         "SIGHT_PROVIDER_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -158,7 +158,7 @@ leave the credential in Keychain:
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki/sight-mcp@0.2.1"]
+args = ["-y", "@weiki/sight-mcp@0.3.0"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 

@@ -32,7 +32,7 @@ Sight MCP 提供两个只读图像工具：`analyze_image` 用于读取已授权
 
 ```sh
 # 1. 一次性保存你的 Provider 密钥（macOS Keychain；交互式输入，不会进入 shell 历史）
-npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
+npx -y @weiki/sight-mcp@0.3.0 credentials set my-provider
 
 # 2. 在你的宿主中注册服务，并用环境变量指定端点与模型（见下方配置片段）。
 
@@ -75,7 +75,7 @@ npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
 宿主应运行固定版本的 scoped 包：
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.1
+npx -y @weiki/sight-mcp@0.3.0
 ```
 
 无关的未加 scope 的 `sight-mcp` 包不是本项目。在做 release-candidate 测试时，请安装并使用生成的
@@ -95,8 +95,8 @@ API 密钥按以下顺序解析：`SIGHT_PROVIDER_API_KEY` 环境变量 → macO
 `.env` 文件中：
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
-npx -y @weiki/sight-mcp@0.2.1 credentials status my-provider
+npx -y @weiki/sight-mcp@0.3.0 credentials set my-provider
+npx -y @weiki/sight-mcp@0.3.0 credentials status my-provider
 ```
 
 账户名（上例为 `my-provider`）由你自取，需与宿主环境变量 `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`
@@ -116,7 +116,7 @@ Claude Code 支持在 local、project、user 三种作用域下运行本地 stdi
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki/sight-mcp@0.2.1"],
+      "args": ["-y", "@weiki/sight-mcp@0.3.0"],
       "env": {
         "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images",
         "SIGHT_PROVIDER_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -141,7 +141,7 @@ Codex 从 `~/.codex/config.toml` 读取用户配置；可信项目也可以改�
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki/sight-mcp@0.2.1"]
+args = ["-y", "@weiki/sight-mcp@0.3.0"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
