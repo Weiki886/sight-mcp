@@ -54,16 +54,18 @@ The normal test suite never calls a live provider and never requires a real cred
 - cwd-only root default and platform-delimited explicit roots;
 - nonexistent, relative, duplicate, nested, root-level, and home-level allowed roots;
 - secret redaction at every log level and error path.
-- fixed Qwen/DeepSeek endpoint, model, and default-effort mappings;
-- profile credential precedence: generic override, selected Provider environment variable, then
-  selected Keychain account;
-- an unselected Provider credential is never read and missing/failed Keychain lookup fails closed;
-- generic no-argument configuration remains backward compatible.
+- credential precedence: the `SIGHT_PROVIDER_API_KEY` environment variable first, then the Keychain
+  account named by `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`;
+- Keychain is never read when an environment key is set, and a missing/failed Keychain lookup fails
+  closed;
+- with no credential configured at all, the endpoint is treated as unauthenticated.
 
 ### Credential CLI and macOS Keychain
 
-- the CLI parser accepts only the documented profile and credential command grammar and returns
-  usage status `2` for invalid input;
+- the CLI parser accepts only the documented credential command grammar and valid account names,
+  returning usage status `2` for invalid input;
+- the removed `--provider` flag exits with status `2`, prints migration guidance, and never echoes
+  the input value;
 - set invokes the absolute system command without a shell, puts prompt-only `-w` last, passes no
   secret argument, and rejects a non-interactive terminal;
 - get/status/delete use the exact service and selected account; status never requests password
@@ -146,8 +148,9 @@ client.
 - bounded parallel calls, queue full behavior, and clean shutdown;
 - stdout parses entirely as MCP traffic; all diagnostics are on stderr;
 - startup configuration failure exits non-zero before accepting protocol input;
-- `--provider qwen|deepseek` initializes and lists the Tool with the selected environment-key
-  fallback while an invalid profile exits before emitting protocol stdout;
+- environment-based configuration (including an environment API key) initializes and lists the Tool,
+  while the removed `--provider` flag and unknown arguments exit with status `2` before emitting
+  protocol stdout;
 - a 2025-era compatibility handshake is included if the official v2 SDK test client supports it
   without legacy server code.
 
@@ -164,16 +167,16 @@ Record host version, Node version, operating system, package digest, provider ty
 real/remote real), result, and sanitized failure evidence. Do not publish keys, personal paths,
 images, or complete provider payloads.
 
-At least one release-candidate smoke run uses a local OpenAI-compatible endpoint. Before Issue #16
-is accepted for release, both documented profiles require a user-authorized remote smoke test with
-non-sensitive synthetic chart/OCR fixtures, and at least one Claude Code and one Codex entry must
-launch the packed artifact with `--provider`. Natural-language answers are reviewed for capability,
-not asserted byte-for-byte.
+At least one release-candidate smoke run uses a local OpenAI-compatible endpoint. Before release, a
+user-authorized remote smoke test (`--live` mode with non-sensitive synthetic chart/OCR fixtures,
+with endpoint, model, and key injected entirely through the runner's environment variables) is
+required, and at least one Claude Code and one Codex entry must launch the packed artifact in that
+mode. Natural-language answers are reviewed for capability, not asserted byte-for-byte.
 
 On macOS, validate the actual Keychain boundary separately with a generated canary under an isolated
 test service name: write interactively, check existence without revealing it, read and compare it in
 memory, delete the exact item, and confirm it is absent. The cleanup result is part of the sanitized
-test record. Never overwrite or read a user's production `qwen` or `deepseek` item for this check.
+test record. Never overwrite or read a user's production account item for this check.
 
 ## CI design
 

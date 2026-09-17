@@ -48,9 +48,9 @@ Before publication, the maintainer must verify all of the following against one 
 3. Local SHA-256 equals `artifact.sha256`.
 4. `gh attestation verify weiki-sight-mcp-0.1.0.tgz --repo Weiki886/sight-mcp` succeeds.
 5. The CycloneDX SBOM identifies `@weiki/sight-mcp@0.1.0` and its installed production tree.
-6. Claude Code and Codex Host records pass for that digest. For a candidate containing Issue #16,
-   the live Qwen/DeepSeek profile records must also pass for that digest without placing credentials
-   in Host config or command arguments.
+6. Claude Code and Codex Host records pass for that digest, and at least one `--live` remote record
+   passes for that digest; credentials are injected only through the runner's environment variables,
+   never placed in Host config or command arguments.
 7. `pnpm audit --prod --audit-level high`, the production-license gate, package allowlist, workflow
    security gate, and repository secret scan are reviewed.
 8. npm identity and scoped-package ownership are proven while authenticated:

@@ -1,13 +1,11 @@
-import type { ProviderProfileName } from "../provider-profiles.js";
-
 export interface CredentialReader {
-  readonly get: (provider: ProviderProfileName) => Promise<string | undefined>;
+  readonly get: (account: string) => Promise<string | undefined>;
 }
 
 export interface CredentialStore extends CredentialReader {
-  readonly delete: (provider: ProviderProfileName) => Promise<boolean>;
-  readonly has: (provider: ProviderProfileName) => Promise<boolean>;
-  readonly setInteractively: (provider: ProviderProfileName) => Promise<void>;
+  readonly delete: (account: string) => Promise<boolean>;
+  readonly has: (account: string) => Promise<boolean>;
+  readonly setInteractively: (account: string) => Promise<void>;
 }
 
 export type CredentialStoreErrorCode =

@@ -1,8 +1,6 @@
 import { spawn } from "node:child_process";
 
 import { CredentialStoreError, type CredentialStore } from "../../credentials/credential-store.js";
-import type { ProviderProfileName } from "../../provider-profiles.js";
-
 export const keychainService = "dev.weiki886.sight-mcp.provider-api-key";
 
 const securityCommand = "/usr/bin/security";
@@ -101,11 +99,7 @@ function commandFailed(): CredentialStoreError {
   );
 }
 
-function findArguments(
-  provider: ProviderProfileName,
-  reveal: boolean,
-  service: string,
-): readonly string[] {
+function findArguments(provider: string, reveal: boolean, service: string): readonly string[] {
   return Object.freeze([
     "find-generic-password",
     "-a",
@@ -130,7 +124,7 @@ export function createMacOSKeychainStore(options: MacOSKeychainStoreOptions = {}
   }
 
   return Object.freeze({
-    async delete(provider: ProviderProfileName): Promise<boolean> {
+    async delete(provider: string): Promise<boolean> {
       requireMacOS();
       const result = await run(["delete-generic-password", "-a", provider, "-s", service], {
         captureStdout: false,
@@ -145,7 +139,7 @@ export function createMacOSKeychainStore(options: MacOSKeychainStoreOptions = {}
       throw commandFailed();
     },
 
-    async get(provider: ProviderProfileName): Promise<string | undefined> {
+    async get(provider: string): Promise<string | undefined> {
       requireMacOS();
       const result = await run(findArguments(provider, true, service), {
         captureStdout: true,
@@ -162,7 +156,7 @@ export function createMacOSKeychainStore(options: MacOSKeychainStoreOptions = {}
         .replace(/\r?\n$/u, "");
     },
 
-    async has(provider: ProviderProfileName): Promise<boolean> {
+    async has(provider: string): Promise<boolean> {
       requireMacOS();
       const result = await run(findArguments(provider, false, service), {
         captureStdout: false,
@@ -177,7 +171,7 @@ export function createMacOSKeychainStore(options: MacOSKeychainStoreOptions = {}
       throw commandFailed();
     },
 
-    async setInteractively(provider: ProviderProfileName): Promise<void> {
+    async setInteractively(provider: string): Promise<void> {
       requireMacOS();
       if (!inputIsTTY || !outputIsTTY) {
         throw new CredentialStoreError(

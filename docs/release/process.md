@@ -43,8 +43,8 @@ SBOM。上传的产物只包含：
 3. 本地 SHA-256 与 `artifact.sha256` 一致。
 4. `gh attestation verify weiki-sight-mcp-0.1.0.tgz --repo Weiki886/sight-mcp` 成功。
 5. CycloneDX SBOM 标识出 `@weiki/sight-mcp@0.1.0` 及其已安装的生产依赖树。
-6. 该摘要对应的 Claude Code 与 Codex Host 记录均通过。若候选产物包含 Issue
-   #16，还必须有针对该摘要的 Qwen/DeepSeek 实测 profile 记录通过，且不得把凭据放进 Host 配置或命令行参数。
+6. 该摘要对应的 Claude Code 与 Codex Host 记录均通过，且至少一条针对该摘要的 `--live`
+   远端实测记录通过；凭据只通过运行器环境变量注入，不得放进 Host 配置或命令行参数。
 7. `pnpm audit --prod --audit-level high`、生产许可证门禁、包白名单、工作流安全门禁以及仓库密钥扫描均已复核。
 8. 在已认证状态下证明 npm 身份与 scope 包归属：
 

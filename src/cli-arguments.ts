@@ -1,35 +1,35 @@
-import { isProviderProfileName, type ProviderProfileName } from "./provider-profiles.js";
-
 export type CliCommand =
-  | Readonly<{ kind: "serve"; provider?: ProviderProfileName }>
+  | Readonly<{ kind: "serve" }>
   | Readonly<{
+      account: string;
       action: "delete";
       assumeYes: boolean;
       kind: "credentials";
-      provider: ProviderProfileName;
     }>
   | Readonly<{
+      account: string;
       action: "set";
       kind: "credentials";
-      provider: ProviderProfileName;
     }>
   | Readonly<{
+      account: string;
       action: "status";
       kind: "credentials";
-      provider?: ProviderProfileName;
     }>;
 
+const usageMessage = "Usage: sight-mcp | credentials <set|status|delete> <account> [--yes]";
+
 export class CliUsageError extends Error {
-  public constructor() {
-    super(
-      "Usage: sight-mcp [--provider <qwen|deepseek>] | credentials <set|status|delete> [qwen|deepseek] [--yes]",
-    );
+  public constructor(message: string = usageMessage) {
+    super(message);
     this.name = "CliUsageError";
   }
 }
 
-function requiredProvider(value: string | undefined): ProviderProfileName {
-  if (value === undefined || !isProviderProfileName(value)) {
+const accountPattern = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/u;
+
+function requiredAccount(value: string | undefined): string {
+  if (value === undefined || !accountPattern.test(value)) {
     throw new CliUsageError();
   }
   return value;
@@ -39,8 +39,10 @@ export function parseCliArguments(argumentsValue: readonly string[]): CliCommand
   if (argumentsValue.length === 0) {
     return Object.freeze({ kind: "serve" });
   }
-  if (argumentsValue.length === 2 && argumentsValue[0] === "--provider") {
-    return Object.freeze({ kind: "serve", provider: requiredProvider(argumentsValue[1]) });
+  if (argumentsValue[0] === "--provider") {
+    throw new CliUsageError(
+      "The --provider flag was removed. Configure SIGHT_PROVIDER_BASE_URL and SIGHT_PROVIDER_MODEL for your vision model instead.",
+    );
   }
   if (argumentsValue[0] !== "credentials") {
     throw new CliUsageError();
@@ -49,19 +51,16 @@ export function parseCliArguments(argumentsValue: readonly string[]): CliCommand
   const action = argumentsValue[1];
   if (action === "set" && argumentsValue.length === 3) {
     return Object.freeze({
+      account: requiredAccount(argumentsValue[2]),
       action,
       kind: "credentials",
-      provider: requiredProvider(argumentsValue[2]),
     });
-  }
-  if (action === "status" && argumentsValue.length === 2) {
-    return Object.freeze({ action, kind: "credentials" });
   }
   if (action === "status" && argumentsValue.length === 3) {
     return Object.freeze({
+      account: requiredAccount(argumentsValue[2]),
       action,
       kind: "credentials",
-      provider: requiredProvider(argumentsValue[2]),
     });
   }
   if (action === "delete" && (argumentsValue.length === 3 || argumentsValue.length === 4)) {
@@ -70,10 +69,10 @@ export function parseCliArguments(argumentsValue: readonly string[]): CliCommand
       throw new CliUsageError();
     }
     return Object.freeze({
+      account: requiredAccount(argumentsValue[2]),
       action,
       assumeYes,
       kind: "credentials",
-      provider: requiredProvider(argumentsValue[2]),
     });
   }
   throw new CliUsageError();

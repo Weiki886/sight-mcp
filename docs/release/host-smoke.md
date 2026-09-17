@@ -37,22 +37,23 @@ Host 必须已安装且已完成认证。整个过程不使用任何 Provider �
 
 每份记录只包含 Host/版本、Node、操作系统、本地 Provider 分类、摘要、时间戳与通过/失败状态，不得包含凭据、个人路径、图像、原始模型输出、完整提示词、Provider 请求体或 stdout/stderr 抓取内容。把记录附到发布之前，请按此规则复核。
 
-## 实测内置 profile 模式
+## 实测远端模式（`--live`）
 
-加上 `--profile qwen|deepseek`
-可以针对远端 Provider 校验打包后的 profile 入口。运行器要求其继承的环境中存在
+加上 `--live` 可以针对远端 Provider 校验打包产物。运行器要求其继承的环境中存在
+`SIGHT_PROVIDER_BASE_URL`、`SIGHT_PROVIDER_MODEL` 与
 `SIGHT_PROVIDER_API_KEY`，它会创建一张合成图表，并执行一次有界的视觉调用。请通过已授权的终端或密钥管理器提供密钥，绝不要写进运行器参数或提交到仓库的文件里。
 
 ```sh
+SIGHT_PROVIDER_BASE_URL=https://provider.example/v1 \
+SIGHT_PROVIDER_MODEL=your-vision-model \
+SIGHT_PROVIDER_API_KEY=… \
 pnpm release:host-smoke -- \
   --host claude-code \
-  --archive /absolute/path/to/weiki-sight-mcp-0.1.0.tgz \
-  --record /absolute/path/to/claude-qwen-profile.json \
-  --profile qwen
+  --archive /absolute/path/to/weiki-sight-mcp-0.3.0.tgz \
+  --record /absolute/path/to/claude-live.json \
+  --live
 ```
 
-profile 记录只包含发现/视觉状态与 profile 名称。Host 从运行器进程继承凭据；生成的 MCP 配置与
-`--provider`
-服务器参数中都不含它。这一实测模式是对确定性本地矩阵的补充而非替代：Provider 故障与取消这两道门禁仍在本地合成端点上执行。
+实测记录只包含发现/视觉状态与「远端 OpenAI 兼容端点」这一分类。Host 从运行器进程继承端点、模型与凭据；生成的 MCP 配置中不含任何额外服务参数。这一实测模式是对确定性本地矩阵的补充而非替代：Provider 故障与取消这两道门禁仍在本地合成端点上执行。
 
 若某个 Host 失败，则保持候选产物不发布，只保留脱敏诊断信息，向前修复，生成新的候选产物，并对两个 Host 重跑完整矩阵。源码级的 MCP 客户端测试不能替代这套矩阵，但它仍然是一道独立的协议回归门禁。

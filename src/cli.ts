@@ -54,10 +54,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const config = await loadConfig(process.env, {
-    credentialReader: credentialStore,
-    ...(command.provider === undefined ? {} : { providerProfile: command.provider }),
-  });
+  const config = await loadConfig(process.env, { credentialReader: credentialStore });
   const logger = createLogger(config.logLevel);
   const handle = startStdioServer(config, logger);
   registerShutdown(handle, logger);

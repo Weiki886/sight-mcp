@@ -32,9 +32,9 @@ Sight MCP 提供两个只读图像工具：`analyze_image` 用于读取已授权
 
 ```sh
 # 1. 一次性保存你的 Provider 密钥（macOS Keychain；交互式输入，不会进入 shell 历史）
-npx -y @weiki/sight-mcp@0.2.1 credentials set qwen
+npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
 
-# 2. 在你的宿主中注册服务并选择 Provider（见下方配置片段）。
+# 2. 在你的宿主中注册服务，并用环境变量指定端点与模型（见下方配置片段）。
 
 # 3. 让模型分析一张图片：
 #    analyze_image(path="/absolute/path/to/image.png", prompt="总结一下这张截图")
@@ -56,8 +56,8 @@ npx -y @weiki/sight-mcp@0.2.1 credentials set qwen
   不产生任何临时副本；图片在发送前于内存中移除元数据、校正方向、不做放大只做缩小。
 - **一键读取剪切板（macOS）** —— `analyze_clipboard_image`
   会请求一次显式的原生授权，并在所有退出路径中删除临时中转文件。
-- **内置国内模型** —— `--provider qwen`（Qwen 3.8 Flash）与 `--provider deepseek` （DeepSeek V4
-  Flash Vision Exp），各自对应一组经过审核的固定端点 + 模型。
+- **任意视觉模型** —— 不内置任何模型；通过 `SIGHT_PROVIDER_BASE_URL` + `SIGHT_PROVIDER_MODEL`
+  接入任何 OpenAI 兼容视觉端点（本地或远程），模型升级、下线都由你掌控。
 - **Keychain 优先凭据** ——
   macOS 上把密钥存在宿主配置与 shell 历史之外；在 Linux、Windows 和 CI 上仍可通过环境变量保持可移植。
 - **失败即关闭、可观测**
@@ -83,28 +83,32 @@ npx -y @weiki/sight-mcp@0.2.1
 
 ## 模型配置
 
-把每个远程 Provider 的密钥在 macOS
-Keychain 中保存一次。系统命令会直接以交互方式索要密钥，因此密钥不会出现在命令、shell 历史、MCP 宿主配置或仓库的
+Sight MCP 不内置任何模型。你通过两个必填环境变量接入任意 OpenAI 兼容视觉端点：
+
+- `SIGHT_PROVIDER_BASE_URL`：Provider API 根地址（远程必须 HTTPS；本机回环可用精确 HTTP）。
+- `SIGHT_PROVIDER_MODEL`：该端点上的视觉模型标识。
+
+API 密钥按以下顺序解析：`SIGHT_PROVIDER_API_KEY` 环境变量 → macOS Keychain（由
+`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` 指定账户名）。两者都未设置时按无鉴权端点处理（适合本地服务）。
+
+在 macOS 上，推荐把密钥在 Keychain 中保存一次。系统命令会直接以交互方式索要密钥，因此密钥不会出现在命令、shell 历史、MCP 宿主配置或仓库的
 `.env` 文件中：
 
 ```sh
-npx -y @weiki/sight-mcp@0.2.1 credentials set qwen
-npx -y @weiki/sight-mcp@0.2.1 credentials set deepseek
-npx -y @weiki/sight-mcp@0.2.1 credentials status
+npx -y @weiki/sight-mcp@0.2.1 credentials set my-provider
+npx -y @weiki/sight-mcp@0.2.1 credentials status my-provider
 ```
 
-只配置你真正使用的 Provider。`credentials status [qwen|deepseek]` 会报告 `configured` 或
-`missing`，但不会读取已存储的密码。要删除某个条目，运行
-`credentials delete qwen|deepseek`；除非显式加上 `--yes`，否则删除前会要求确认。
-
-用 `--provider qwen` 或 `--provider deepseek`
-启动服务。该 profile 绑定了经过审核的 API 根地址、模型、默认推理强度，以及对应的 Keychain 账户。切换参数并重启宿主即可切换 Provider；Sight
-MCP 永远不会自动回退。
+账户名（上例为 `my-provider`）由你自取，需与宿主环境变量 `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`
+保持一致。`credentials status <account>` 会报告 `configured` 或
+`missing`，但不会读取已存储的密码。要删除某个条目，运行 `credentials delete <account>`；除非显式加上
+`--yes`，否则删除前会要求确认。切换端点或模型只需修改环境变量并重启宿主；Sight
+MCP 永远不会自动回退到其它 Provider。
 
 ## Claude Code 配置
 
 Claude Code 支持在 local、project、user 三种作用域下运行本地 stdio 服务。项目级配置是项目根目录下的
-`.mcp.json`。在 macOS 上，推荐的 profile 配置里不含任何 API 密钥：
+`.mcp.json`。在 macOS 上，推荐的配置里不含任何 API 密钥（密钥在 Keychain 中）：
 
 ```json
 {
@@ -112,9 +116,12 @@ Claude Code 支持在 local、project、user 三种作用域下运行本地 stdi
     "sight-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@weiki/sight-mcp@0.2.1", "--provider", "qwen"],
+      "args": ["-y", "@weiki/sight-mcp@0.2.1"],
       "env": {
-        "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images"
+        "SIGHT_ALLOWED_ROOTS": "/absolute/path/to/allowed/images",
+        "SIGHT_PROVIDER_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "SIGHT_PROVIDER_MODEL": "qwen3.8-flash",
+        "SIGHT_PROVIDER_KEYCHAIN_ACCOUNT": "my-provider"
       }
     }
   }
@@ -129,17 +136,20 @@ Claude Code 支持在 local、project、user 三种作用域下运行本地 stdi
 ## Codex 配置
 
 Codex 从 `~/.codex/config.toml` 读取用户配置；可信项目也可以改用
-`.codex/config.toml`。在 macOS 上，在 `args` 中选择 profile，并把凭据留在 Keychain 中：
+`.codex/config.toml`。在 macOS 上，用环境变量选择端点与模型，并把凭据留在 Keychain 中：
 
 ```toml
 [mcp_servers.sight-mcp]
 command = "npx"
-args = ["-y", "@weiki/sight-mcp@0.2.1", "--provider", "qwen"]
+args = ["-y", "@weiki/sight-mcp@0.2.1"]
 startup_timeout_sec = 20
 tool_timeout_sec = 70
 
 [mcp_servers.sight-mcp.env]
 SIGHT_ALLOWED_ROOTS = "/absolute/path/to/allowed/images"
+SIGHT_PROVIDER_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+SIGHT_PROVIDER_MODEL = "qwen3.8-flash"
+SIGHT_PROVIDER_KEYCHAIN_ACCOUNT = "my-provider"
 ```
 
 用 `codex mcp list` 验证服务发现，用 Codex 内的 `/mcp` 检查连接。工具超时有意略长于 Sight
@@ -177,11 +187,10 @@ analyze_clipboard_image(prompt)   (仅 macOS)
 | `SIGHT_TRANSMIT_MAX_DIMENSION`      | `2048`       | 不放大前提下的归一化最大宽或高                           |
 | `SIGHT_MAX_TRANSMIT_BYTES`          | `10485760`   | 归一化后的最大图片字节数                                 |
 | `SIGHT_JPEG_QUALITY`                | `85`         | 不透明 JPEG 质量，范围 40 到 95                          |
-| `SIGHT_PROVIDER_BASE_URL`           | required*    | Provider API 根地址；远程用 HTTPS，本机回环可用精确 HTTP |
-| `SIGHT_PROVIDER_MODEL`              | required*    | 配置的视觉模型标识                                       |
-| `SIGHT_PROVIDER_API_KEY`            | 未设置       | 可选的 Bearer 凭据，从宿主继承                           |
-| `SIGHT_QWEN_API_KEY`                | 未设置       | 可选的 `--provider qwen` 环境凭据                        |
-| `SIGHT_DEEPSEEK_API_KEY`            | 未设置       | 可选的 `--provider deepseek` 环境凭据                    |
+| `SIGHT_PROVIDER_BASE_URL`           | 必填         | Provider API 根地址；远程用 HTTPS，本机回环可用精确 HTTP |
+| `SIGHT_PROVIDER_MODEL`              | 必填         | 配置的视觉模型标识                                       |
+| `SIGHT_PROVIDER_API_KEY`            | 未设置       | 可选的 Bearer 凭据，优先于 Keychain                      |
+| `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`   | 未设置       | 可选的 macOS Keychain 账户名；无环境密钥时读取           |
 | `SIGHT_PROVIDER_REASONING_EFFORT`   | 未设置       | 可选 `low`、`medium`、`high`、`xhigh` 或 `max`           |
 | `SIGHT_REQUEST_TIMEOUT_MS`          | `60000`      | 工具整体截止时间，含排队与 Provider 重试                 |
 | `SIGHT_PROVIDER_MAX_TOKENS`         | `4096`       | Provider 回答 token 数上限请求                           |
@@ -196,49 +205,49 @@ analyze_clipboard_image(prompt)   (仅 macOS)
 `;`。避免使用整个 home 目录这类过于宽泛的根目录。客户端声明 `roots`
 能力时，其工作区根目录会在初始化后自动并入允许集合；文件系统根或整个 home 目录这类过宽的工作区根会被拒绝并告警。PNG、JPEG、WebP 依据内容而不是文件扩展名识别。动图或不受支持的格式会被拒绝。图片会被校正方向、移除元数据、不做放大地缩放，并在不透明时编码为 JPEG、需要透明时编码为 PNG。
 
-`*` `SIGHT_PROVIDER_BASE_URL` 与 `SIGHT_PROVIDER_MODEL` 仅在通用无参数模式下才必需。内置的
-`--provider` profile 会把两者作为一组固定参数提供。
+### 配置示例
 
-### 推荐的国内视觉模型
-
-使用 Qwen 3.8 Flash profile 作为首选 Provider：
+以阿里云百炼的 Qwen 3.8 Flash 为例（任何 OpenAI 兼容端点均可照此模式配置）：
 
 ```text
---provider qwen
+SIGHT_PROVIDER_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+SIGHT_PROVIDER_MODEL=qwen3.8-flash
+SIGHT_PROVIDER_REASONING_EFFORT=low
 ```
 
-使用 DeepSeek V4 Flash Vision Exp 作为手动指定的备选：
-
-```text
---provider deepseek
-```
-
-这两个 profile 分别使用 `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen3.8-flash`，以及
-`https://api.deepseek.com` + `deepseek-v4-flash-vision-exp`；两者默认推理强度均为
-`low`。macOS 上优先使用 Keychain。在 Linux、Windows、CI，或只是想做一次性临时覆盖时，可以在宿主进程环境中设置
-`SIGHT_QWEN_API_KEY`、`SIGHT_DEEPSEEK_API_KEY`，或更高优先级的通用
+macOS 上优先使用 Keychain（`SIGHT_PROVIDER_KEYCHAIN_ACCOUNT` +
+`credentials set`）。在 Linux、Windows、CI，或只是想做一次性临时覆盖时，可以直接在宿主进程环境中设置
 `SIGHT_PROVIDER_API_KEY`。绝不要把真实密钥粘贴到被跟踪的
 `.mcp.json`、`config.toml`、`.env`、shell 脚本、Issue 或日志中。
 
-无参数的通用模式仍可用于本地或其它 OpenAI 兼容端点：
+本地或其它无鉴权的 OpenAI 兼容端点可以不配置任何密钥：
 
 ```text
 SIGHT_PROVIDER_BASE_URL=http://127.0.0.1:11434/v1
 SIGHT_PROVIDER_MODEL=your-vision-model
-SIGHT_PROVIDER_API_KEY=optional-for-local-endpoints
 ```
 
 ### 从 `.env` 或宿主托管的明文迁移
 
-1. 在交互式终端运行 `credentials set qwen` 和/或 `credentials set deepseek`。
-2. 用 `credentials status` 确认要保留的条目。
-3. 在宿主的服务参数中加入 `--provider qwen` 或 `--provider deepseek`。
-4. 从宿主条目中移除 API 密钥与通用 Provider URL/模型，然后重启宿主。
-5. 在确认工具被发现、且一次合成图片调用成功后，安全删除你能控制的
+1. 在交互式终端运行 `credentials set <account>`。
+2. 用 `credentials status <account>` 确认条目已写入。
+3. 在宿主环境变量中设置 `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT=<account>`，并移除明文 API 密钥。
+4. 重启宿主，在确认工具被发现、且一次合成图片调用成功后，安全删除你能控制的
    `.env`、shell 脚本、剪切板管理器和配置备份中的旧明文副本。
 
-在 Keychain 启动被验证之前，不要删除旧的副本。如果需要回滚，移除 `--provider`
-并恢复原先仅靠环境变量的配置。
+在 Keychain 启动被验证之前，不要删除旧的副本。如果需要回滚，移除 `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`
+并恢复原先的环境密钥配置。
+
+### 从 0.2.x 的 `--provider` profile 迁移
+
+0.3.0 移除了内置 profile 与 `--provider` 参数（`deepseek-v4-flash-vision-exp` 已下线）。迁移方式：
+
+1. 在宿主环境变量中显式设置 `SIGHT_PROVIDER_BASE_URL` 与 `SIGHT_PROVIDER_MODEL`（原 qwen
+   profile 对应 `https://dashscope.aliyuncs.com/compatible-mode/v1` + `qwen3.8-flash`）。
+2. 从服务参数中移除 `--provider`；`SIGHT_QWEN_API_KEY` / `SIGHT_DEEPSEEK_API_KEY` 不再被读取，请改用
+   `SIGHT_PROVIDER_API_KEY`。
+3. 已存在的 Keychain 条目仍然有效：把 `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`
+   设为原 profile 名（`qwen`）即可继续复用，也可用 `credentials delete <account>` 清理。
 
 ## 隐私与数据流向
 
@@ -271,10 +280,11 @@ Sight MCP 从不跟随重定向，也从不静默切换端点。它只对连接�
 
 ## 排错
 
-- **服务未连接：** 运行宿主的 MCP 列表/获取命令。确认 Node 22+、scoped 包名，以及合法的 `--provider`
-  profile 或两个通用 Provider 变量。
-- **profile 凭据缺失：** 运行 `credentials status qwen|deepseek`，然后在交互式 macOS 终端运行
-  `credentials set qwen|deepseek`。在其它操作系统上，注入所选 profile 的环境变量。
+- **服务未连接：** 运行宿主的 MCP 列表/获取命令。确认 Node 22+、scoped 包名，以及
+  `SIGHT_PROVIDER_BASE_URL` 与 `SIGHT_PROVIDER_MODEL` 均已设置。
+- **Keychain 凭据缺失：** 运行 `credentials status <account>`，然后在交互式 macOS 终端运行
+  `credentials set <account>`，并确认 `SIGHT_PROVIDER_KEYCHAIN_ACCOUNT`
+  与账户名一致。在其它操作系统上，改用 `SIGHT_PROVIDER_API_KEY` 环境变量。
 - **Keychain 查询失败：** 解锁登录钥匙串后重试。Sight MCP 会失败即关闭，不会切换 Provider 或凭据。
 - **启动立即退出：**
   允许的根目录必须是已存在的绝对目录；非回环的 HTTP 端点会被拒绝，必须使用 HTTPS。
@@ -324,6 +334,7 @@ request。除很小的修复外，请先开一个 issue，以便在写代码前�
 - [v0.1.0 提案与完整规范](docs/proposals/0001-sight-mcp-v0.1.0.md)
 - [运行时与架构 ADR](docs/adr/0001-runtime-and-architecture.md)
 - [macOS Keychain 与 Provider profiles ADR](docs/adr/0002-macos-keychain-provider-profiles.md)
+- [通用 Provider 配置 ADR](docs/adr/0004-generic-provider-configuration.md)
 - [一键剪切板图片读取 ADR](docs/adr/0003-clipboard-image-reading.md)
 - [视觉工具与 Provider 契约](docs/specs/vision-tool-contract.md)
 - [配置规范](docs/specs/configuration.md)

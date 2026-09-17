@@ -43,26 +43,26 @@ and pass/fail statuses. It must not contain credentials, personal paths, images,
 complete prompts, Provider request bodies, or stdout/stderr captures. Review records for that rule
 before attaching them to a release.
 
-## Live built-in profile mode
+## Live remote mode (`--live`)
 
-Add `--profile qwen|deepseek` to validate the packed profile entry against its remote Provider. The
-runner requires `SIGHT_PROVIDER_API_KEY` in its inherited environment, creates a synthetic chart,
-and performs one bounded vision call. Supply the key through an already authorized terminal or
-secret manager; never put it in the runner arguments or a committed file.
+Add `--live` to validate the packed artifact against a remote Provider. The runner requires
+`SIGHT_PROVIDER_BASE_URL`, `SIGHT_PROVIDER_MODEL`, and `SIGHT_PROVIDER_API_KEY` in its inherited
+environment; it creates one synthetic chart and performs one bounded vision call. Provide the key
+through an authorized terminal or secret manager, never in runner arguments or committed files.
 
 ```sh
+SIGHT_PROVIDER_BASE_URL=https://provider.example/v1 \
+SIGHT_PROVIDER_MODEL=your-vision-model \
+SIGHT_PROVIDER_API_KEY=… \
 pnpm release:host-smoke -- \
   --host claude-code \
-  --archive /absolute/path/to/weiki-sight-mcp-0.1.0.tgz \
-  --record /absolute/path/to/claude-qwen-profile.json \
-  --profile qwen
+  --archive /absolute/path/to/weiki-sight-mcp-0.3.0.tgz \
+  --record /absolute/path/to/claude-live.json \
+  --live
 ```
 
-The profile record contains only discovery/vision status and the profile name. The Host inherits the
-credential from the runner process; the generated MCP config and `--provider` server arguments do
-not contain it. This live mode supplements rather than replaces the deterministic local matrix:
-Provider failure and cancellation gates stay on the local synthetic endpoint.
-
-If a Host fails, keep the candidate unpublished, retain only sanitized diagnostics, fix forward,
-create a new candidate, and rerun the full matrix for both Hosts. A source-level MCP client test is
-not a substitute for this matrix, though it remains an independent protocol regression gate.
+The live record contains only discovery/vision status and the "remote OpenAI-compatible endpoint"
+classification. The host inherits the endpoint, model, and credential from the runner process; the
+generated MCP config carries no extra server arguments. This live mode complements rather than
+replaces the deterministic local matrix: the provider-failure and cancellation gates still run
+against the local synthetic endpoint.
